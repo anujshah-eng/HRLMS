@@ -10,18 +10,6 @@ class AIInterviewRoleResponseDTO(BaseModel):
     class Config:
         from_attributes = True
 
-
-
-class InterviewRoundResponse(BaseModel):
-    id: int
-    name: str
-    description: str | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
-
 class InterviewQuestionResponseDTO(BaseModel):
     id: int
     question_text: str
@@ -34,34 +22,6 @@ class InterviewQuestionResponseDTO(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-# class LanguageDto(BaseModel):
-#     id: int
-#     name: str
-#     code: str
-#     main_name: str | None = None
-#     is_active: bool
-#     video_blink_1: str | None = None
-#     video_blink_2: str | None = None
-#     video_dubb: str | None = None
-    
-#     class Config:
-#         from_attributes = True
-
-# class AvatarDto(BaseModel):
-#     id: int
-#     language_id: int
-#     avatar_name: str
-#     greet_video: str | None
-#     video_blink_1: str | None
-#     video_blink_2: str | None
-#     video_dubb: str | None
-#     img: str | None
-#     accent: str | None
-
-#     class Config:
-#         from_attributes = True
 
 # Real-time Interview Session Response DTOs
 class InterviewSessionResponseDTO(BaseModel):

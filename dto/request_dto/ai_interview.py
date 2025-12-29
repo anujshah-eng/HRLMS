@@ -8,12 +8,6 @@ class AIInterviewRoleUpdateDTO(BaseModel):
     title: str = Field(..., max_length=255)
     description: str | None = Field(None, max_length=1000)
 
-
-
-class CreateInterviewRoundRequest(BaseModel):
-    name: str = Field(..., max_length=255)
-    description: str | None = Field(None, max_length=1000)
-
 class QuestionCreateDTO(BaseModel):
     question_text: str = Field(..., max_length=2000)
     topic: str | None = Field(None, max_length=100)
@@ -26,7 +20,6 @@ class QuestionUpdateDTO(BaseModel):
     role_id: int | None = None
     expected_keywords: str | None = Field(None, max_length=500)
     is_active: bool | None = None
-
 
 # Real-time Interview Session DTOs
 class CreateInterviewSessionDTO(BaseModel):

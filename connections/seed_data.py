@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from models.user_management import Role, User, UserRole
 from models.tenant import Tenant
-from models.ai_interview_model import AIInterviewRoles, TargetCompany, InterviewRounds, AIInterviewers
+from models.ai_interview_model import AIInterviewRoles, AIInterviewers
 from models.usage_models import SubscriptionPlan, UsageQuota
 from models.organization import Designation
 from custom_utilities.custom_exception import CustomException
@@ -18,13 +18,9 @@ def seed_initial_data(db_session: Session) -> None:
     insert_default_usage_quotas(db_session)
     insert_default_designation(db_session)
     insert_default_interview_roles(db_session)
-    insert_default_target_companies(db_session)
-    insert_default_interview_rounds(db_session)
-    # insert_default_languages(db_session)
-    # insert_default_avatars(db_session)
     insert_default_interviewers(db_session)
     insert_default_department_and_batch(db_session)
-    # Future seeders like insert_default_subjects(db_session)
+
 
 def insert_default_tenant(db_session: Session):
     key = os.getenv("DEFAULT_TENANT_KEY", "ace")
@@ -389,199 +385,6 @@ def insert_default_interview_roles(db_session: Session):
         print("Default interview roles already exist.")
 
 def insert_default_target_companies(db_session: Session):
-    """Insert default target companies with website URLs."""
-    now = datetime.now(timezone.utc)
-    default_companies = [
-        # IT Services & Consulting Companies
-        {"name": "TCS", "website": "https://www.tcs.com", "created_at": now, "updated_at": now},
-        {"name": "Infosys", "website": "https://www.infosys.com", "created_at": now, "updated_at": now},
-        {"name": "Wipro", "website": "https://www.wipro.com", "created_at": now, "updated_at": now},
-        {"name": "HCL Technologies", "website": "https://www.hcltech.com", "created_at": now, "updated_at": now},
-        {"name": "Tech Mahindra", "website": "https://www.techmahindra.com", "created_at": now, "updated_at": now},
-        {"name": "Cognizant", "website": "https://www.cognizant.com", "created_at": now, "updated_at": now},
-        {"name": "Capgemini", "website": "https://www.capgemini.com", "created_at": now, "updated_at": now},
-        {"name": "Accenture", "website": "https://www.accenture.com", "created_at": now, "updated_at": now},
-        {"name": "IBM", "website": "https://www.ibm.com", "created_at": now, "updated_at": now},
-        {"name": "Deloitte", "website": "https://www.deloitte.com", "created_at": now, "updated_at": now},
-        {"name": "KPMG", "website": "https://www.kpmg.com", "created_at": now, "updated_at": now},
-        {"name": "PwC", "website": "https://www.pwc.com", "created_at": now, "updated_at": now},
-        {"name": "EY", "website": "https://www.ey.com", "created_at": now, "updated_at": now},
-        {"name": "L&T Technology Services", "website": "https://www.ltts.com", "created_at": now, "updated_at": now},
-        {"name": "LTIMindtree", "website": "https://www.ltimindtree.com", "created_at": now, "updated_at": now},
-        {"name": "Mphasis", "website": "https://www.mphasis.com", "created_at": now, "updated_at": now},
-        {"name": "Birlasoft", "website": "https://www.birlasoft.com", "created_at": now, "updated_at": now},
-        {"name": "Hexaware", "website": "https://www.hexaware.com", "created_at": now, "updated_at": now},
-        {"name": "Zensar Technologies", "website": "https://www.zensar.com", "created_at": now, "updated_at": now},
-        {"name": "UST Global", "website": "https://www.ust.com", "created_at": now, "updated_at": now},
-        {"name": "CGI", "website": "https://www.cgi.com", "created_at": now, "updated_at": now},
-        {"name": "Atos Syntel", "website": "https://www.atos.net", "created_at": now, "updated_at": now},
-        {"name": "Virtusa", "website": "https://www.virtusa.com", "created_at": now, "updated_at": now},
-        {"name": "GlobalLogic", "website": "https://www.globallogic.com", "created_at": now, "updated_at": now},
-        {"name": "DXC Technology", "website": "https://www.dxc.com", "created_at": now, "updated_at": now},
-        {"name": "Happiest Minds", "website": "https://www.happiestminds.com", "created_at": now, "updated_at": now},
-        {"name": "Sonata Software", "website": "https://www.sonata-software.com", "created_at": now, "updated_at": now},
-        {"name": "Sutherland", "website": "https://www.sutherlandglobal.com", "created_at": now, "updated_at": now},
-        {"name": "NTT Data", "website": "https://www.nttdata.com", "created_at": now, "updated_at": now},
-        {"name": "Mindtree", "website": "https://www.mindtree.com", "created_at": now, "updated_at": now},
-        {"name": "Nihilent", "website": "https://www.nihilent.com", "created_at": now, "updated_at": now},
-        {"name": "Aspire Systems", "website": "https://www.aspiresys.com", "created_at": now, "updated_at": now},
-
-        # Banking & Financial Services
-        {"name": "Goldman Sachs", "website": "https://www.goldmansachs.com", "created_at": now, "updated_at": now},
-        {"name": "JP Morgan Chase", "website": "https://www.jpmorganchase.com", "created_at": now, "updated_at": now},
-        {"name": "Morgan Stanley", "website": "https://www.morganstanley.com", "created_at": now, "updated_at": now},
-        {"name": "HSBC", "website": "https://www.hsbc.com", "created_at": now, "updated_at": now},
-        {"name": "Barclays", "website": "https://www.barclays.com", "created_at": now, "updated_at": now},
-        {"name": "Wells Fargo", "website": "https://www.wellsfargo.com", "created_at": now, "updated_at": now},
-        {"name": "American Express", "website": "https://www.americanexpress.com", "created_at": now, "updated_at": now},
-
-        # Fintech & Digital Payments
-        {"name": "Paytm", "website": "https://www.paytm.com", "created_at": now, "updated_at": now},
-        {"name": "PhonePe", "website": "https://www.phonepe.com", "created_at": now, "updated_at": now},
-        {"name": "Razorpay", "website": "https://www.razorpay.com", "created_at": now, "updated_at": now},
-        {"name": "Pine Labs", "website": "https://www.pinelabs.com", "created_at": now, "updated_at": now},
-        {"name": "BharatPe", "website": "https://www.bharatpe.com", "created_at": now, "updated_at": now},
-        {"name": "NPCI", "website": "https://www.npci.org.in", "created_at": now, "updated_at": now},
-        {"name": "PayU", "website": "https://www.payu.in", "created_at": now, "updated_at": now},
-        {"name": "Groww", "website": "https://www.groww.in", "created_at": now, "updated_at": now},
-        {"name": "Zerodha", "website": "https://www.zerodha.com", "created_at": now, "updated_at": now},
-        {"name": "ICICI Bank", "website": "https://www.icicibank.com", "created_at": now, "updated_at": now},
-        {"name": "HDFC Bank", "website": "https://www.hdfcbank.com", "created_at": now, "updated_at": now},
-        {"name": "Axis Bank", "website": "https://www.axisbank.com", "created_at": now, "updated_at": now},
-
-        # Analytics & Data Science
-        {"name": "KPMG Analytics", "website": "https://www.kpmg.com", "created_at": now, "updated_at": now},
-        {"name": "Fractal Analytics", "website": "https://www.fractal.ai", "created_at": now, "updated_at": now},
-        {"name": "Tiger Analytics", "website": "https://www.tigeranalytics.com", "created_at": now, "updated_at": now},
-        {"name": "Mu Sigma", "website": "https://www.mu-sigma.com", "created_at": now, "updated_at": now},
-
-        # BPO & Strategic Consulting
-        {"name": "HCL", "website": "https://www.hcltech.com", "created_at": now, "updated_at": now},
-        {"name": "Infosys BPM", "website": "https://www.infosysbpm.com", "created_at": now, "updated_at": now},
-        {"name": "TCS Digital & BPS", "website": "https://www.tcs.com", "created_at": now, "updated_at": now},
-        {"name": "Deloitte Consulting", "website": "https://www.deloitte.com", "created_at": now, "updated_at": now},
-        {"name": "Accenture Strategy", "website": "https://www.accenture.com", "created_at": now, "updated_at": now},
-        {"name": "McKinsey", "website": "https://www.mckinsey.com", "created_at": now, "updated_at": now},
-        {"name": "BCG", "website": "https://www.bcg.com", "created_at": now, "updated_at": now},
-        {"name": "Bain & Co", "website": "https://www.bain.com", "created_at": now, "updated_at": now},
-        {"name": "Genpact", "website": "https://www.genpact.com", "created_at": now, "updated_at": now},
-        {"name": "WNS Global", "website": "https://www.wns.com", "created_at": now, "updated_at": now},
-        {"name": "EXL Services", "website": "https://www.exlservice.com", "created_at": now, "updated_at": now},
-        {"name": "EY Parthenon", "website": "https://www.ey.com", "created_at": now, "updated_at": now},
-        {"name": "Grant Thornton", "website": "https://www.grantthornton.com", "created_at": now, "updated_at": now},
-
-        # EdTech
-        {"name": "BYJU'S", "website": "https://www.byjus.com", "created_at": now, "updated_at": now},
-        {"name": "Unacademy", "website": "https://www.unacademy.com", "created_at": now, "updated_at": now},
-        {"name": "Vedantu", "website": "https://www.vedantu.com", "created_at": now, "updated_at": now},
-
-        # Technology & Product Companies
-        {"name": "Microsoft", "website": "https://www.microsoft.com", "created_at": now, "updated_at": now},
-        {"name": "Amazon", "website": "https://www.amazon.com", "created_at": now, "updated_at": now},
-        {"name": "Adobe", "website": "https://www.adobe.com", "created_at": now, "updated_at": now},
-        {"name": "Salesforce", "website": "https://www.salesforce.com", "created_at": now, "updated_at": now},
-        {"name": "Cisco", "website": "https://www.cisco.com", "created_at": now, "updated_at": now},
-        {"name": "Oracle", "website": "https://www.oracle.com", "created_at": now, "updated_at": now},
-        {"name": "VMware", "website": "https://www.vmware.com", "created_at": now, "updated_at": now},
-        {"name": "SAP", "website": "https://www.sap.com", "created_at": now, "updated_at": now},
-        {"name": "Intuit", "website": "https://www.intuit.com", "created_at": now, "updated_at": now},
-        {"name": "Atlassian", "website": "https://www.atlassian.com", "created_at": now, "updated_at": now},
-        {"name": "Uber", "website": "https://www.uber.com", "created_at": now, "updated_at": now},
-        {"name": "Nvidia", "website": "https://www.nvidia.com", "created_at": now, "updated_at": now},
-        {"name": "Qualcomm", "website": "https://www.qualcomm.com", "created_at": now, "updated_at": now},
-        {"name": "Samsung R&D", "website": "https://www.samsung.com", "created_at": now, "updated_at": now},
-        {"name": "Dell Technologies", "website": "https://www.dell.com", "created_at": now, "updated_at": now},
-        {"name": "HP", "website": "https://www.hp.com", "created_at": now, "updated_at": now},
-
-        # Indian Tech & Startups
-        {"name": "Zoho", "website": "https://www.zoho.com", "created_at": now, "updated_at": now},
-        {"name": "Freshworks", "website": "https://www.freshworks.com", "created_at": now, "updated_at": now},
-        {"name": "CRED", "website": "https://www.cred.club", "created_at": now, "updated_at": now},
-        {"name": "Zscaler", "website": "https://www.zscaler.com", "created_at": now, "updated_at": now},
-        {"name": "Akamai", "website": "https://www.akamai.com", "created_at": now, "updated_at": now},
-        {"name": "Flipkart", "website": "https://www.flipkart.com", "created_at": now, "updated_at": now},
-        {"name": "Ola Electric", "website": "https://www.olaelectric.com", "created_at": now, "updated_at": now},
-        {"name": "Swiggy Tech", "website": "https://www.swiggy.com", "created_at": now, "updated_at": now},
-        {"name": "Meesho", "website": "https://www.meesho.com", "created_at": now, "updated_at": now},
-        {"name": "Jio Platforms", "website": "https://www.jio.com", "created_at": now, "updated_at": now},
-        {"name": "InMobi", "website": "https://www.inmobi.com", "created_at": now, "updated_at": now},
-        {"name": "First Point Creation", "website": "https://www.firstpointcreation.com", "created_at": now, "updated_at": now},
-        {"name": "IndiaMart", "website": "https://www.indiamart.com", "created_at": now, "updated_at": now},
-        {"name": "ProDesk IT", "website": "https://www.prodeskit.com", "created_at": now, "updated_at": now},
-        {"name": "E-Team INC", "website": "https://www.eteaminc.com", "created_at": now, "updated_at": now}
-    ]
-
-    existing_names = {
-        company.name
-        for company in db_session.query(TargetCompany.name).all()
-    }
-
-    companies_to_add = [
-        TargetCompany(**company)
-        for company in default_companies
-        if company["name"] not in existing_names
-    ]
-
-    if companies_to_add:
-        db_session.bulk_save_objects(companies_to_add)
-        db_session.commit()
-        print("Default target companies inserted.")
-    else:
-        print("Default target companies already exist.")
-
-
-# create a seeding function with Warm Up Round, Technical Interview, Managerial Round(Behavioral + scenario based), HR Round
-def insert_default_interview_rounds(db_session: Session):
-    """Insert default interview rounds."""
-    
-    now = datetime.now(timezone.utc)
-
-    default_rounds = [
-        {
-            "name": "Warm Up Round",
-            "description": "Initial round to ease candidates into the interview process",
-            "created_at": now,
-            "updated_at": now
-        },
-        {
-            "name": "Technical Interview",
-            "description": "In-depth technical assessment of candidate's skills",
-            "created_at": now,
-            "updated_at": now
-        },
-        {
-            "name": "Managerial Round",
-            "description": "Evaluates leadership, behavioral skills, and scenario handling",
-            "created_at": now,
-            "updated_at": now
-        },
-        {
-            "name": "HR Round",
-            "description": "Assesses cultural fit and interpersonal skills",
-            "created_at": now,
-            "updated_at": now
-        }
-    ]
-
-    existing_rounds = {
-        round_.name
-        for round_ in db_session.query(InterviewRounds.name).all()
-    }
-
-    rounds_to_add = [
-        InterviewRounds(**round_)
-        for round_ in default_rounds
-        if round_["name"] not in existing_rounds
-    ]
-
-    if rounds_to_add:
-        db_session.bulk_save_objects(rounds_to_add)
-        db_session.commit()
-        print("Default interview rounds inserted.")
-    else:
-        print("Default interview rounds already exist.")
-
-# def insert_default_languages(db_session: Session):
 #     """Seed languages. Sets language-level preview/dubbing assets when available."""
 #     now = datetime.now(timezone.utc)
 

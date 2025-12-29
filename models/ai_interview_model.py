@@ -16,49 +16,6 @@ class AIInterviewRoles(Base):
     def __repr__(self):
         return f"<AIInterviewRoles(id={self.id}, title='{self.title}')>"
 
-# class Languages(Base):
-#     __tablename__ = "languages"
-
-#     id = Column(Integer, primary_key=True, index=True)
-#     name = Column(String(100), nullable=False)
-#     code = Column(String(10), nullable=False, unique=True)
-#     main_name = Column(String(100), nullable=True)
-#     is_active = Column(Boolean, default=True)
-#     # old_codes = Column(String(255), nullable=True)
-#     # old_active = Column(Integer, nullable=True)
-#     video_blink_1 = Column(String(255), nullable=True)
-#     video_blink_2 = Column(String(255), nullable=True)
-#     video_dubb = Column(String(255), nullable=True)
-#     # rise_active = Column(Integer, nullable=True)
-#     created_at = Column(DateTime(timezone=True), server_default=func.now())  # pylint: disable=E1102
-#     updated_at = Column(DateTime(timezone=True), server_default=func.now(), server_onupdate=func.now())  # pylint: disable=E1102
-
-#     def __repr__(self):
-#         return f"<Languages(id={self.id}, name='{self.name}', code='{self.code}')>"
-    
-# class Avatars(Base):
-#     __tablename__ = "avatars"
-
-#     id = Column(Integer, primary_key=True, index=True)
-#     language_id = Column(Integer, ForeignKey("languages.id", ondelete="CASCADE"), nullable=False)
-#     avatar_name = Column(String(100), nullable=False)
-#     greet_video = Column(String(255), nullable=True)
-#     video_blink_1 = Column(String(255), nullable=True)
-#     video_blink_2 = Column(String(255), nullable=True)
-#     video_dubb = Column(String(255), nullable=True)
-#     img = Column(String(255), nullable=True)
-#     accent = Column(String(100), nullable=True)
-#     is_active = Column(Boolean, default=True, nullable=False)
-#     # voice_id = Column(Integer, nullable=True)
-#     # is_paid = Column(Integer, nullable=True)
-#     # type = Column(String(50), nullable=True)
-#     # language_code = Column(String(10), nullable=True)
-#     created_at = Column(DateTime(timezone=True), server_default=func.now())  # pylint: disable=E1102
-#     updated_at = Column(DateTime(timezone=True), onupdate=func.now())  # pylint: disable=E1102
-
-#     def __repr__(self):
-#         return f"<Avatars(id={self.id}, avatar_name='{self.avatar_name}', language_id={self.language_id})>"
-
 class AIInterviewers(Base):
     __tablename__ = "ai_interviewers"
 

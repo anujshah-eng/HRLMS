@@ -46,6 +46,7 @@ dependencies = [
     "tavily-python>=0.7.9",
     "langgraph>=0.5.2",
     "langchain-community>=0.3.21",
+    "langchain-openai>=0.2.1",
     "langsmith>=0.3.45",
     "alembic>=1.16.5",
     "motor>=3.5.3",

@@ -36,7 +36,6 @@ dependencies = [
     "firebase_admin==6.5.0",
     # Utils
     "nanoid==2.0.0",
-    "ragmaster",
     "tavily-python>=0.7.9",
     "langgraph>=0.5.2",
     "langchain-community>=0.3.21",
@@ -46,9 +45,6 @@ dependencies = [
     "aioboto3>=13.1.1",
     "aiofiles>=24.1.0",
     "httpx>=0.28.1",
-    "extractipy",
 ]
  
 [tool.uv.sources]
-ragmaster = { git = "https://github.com/Acelucid-Technologies/ragmaster.git" }
-extractipy = { git = "https://github.com/Acelucid-Technologies/extractipy.git", rev = "v2.2.0" }

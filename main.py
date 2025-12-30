@@ -56,7 +56,7 @@ async def lifespan(fastapi_app: FastAPI):
 app = FastAPI(
     title="Acelucid HRLMS",
     version="1.0",
-    description="Adaptive User Education System",
+    description="AI Interview Management",
     lifespan=lifespan
 )
 

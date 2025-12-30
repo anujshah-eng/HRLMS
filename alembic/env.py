@@ -5,6 +5,23 @@ from sqlalchemy import pool
 
 from alembic import context
 
+# Load environment variables before importing models
+import os
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+# Set ENV if not already set (default to 'dev')
+if 'ENV' not in os.environ:
+    os.environ['ENV'] = 'dev'
+
+# Load environment variables
+from config.env_loader import load_env
+load_env()
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

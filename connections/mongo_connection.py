@@ -16,16 +16,26 @@ class MotorMongoDBResourceManager:
         self.client: AsyncIOMotorClient | None = None
         self.db = None
 
-        self.db_name = os.getenv("MONGO_DB_NAME")
-        username = quote_plus(os.getenv("MONGO_USER"))
-        password = os.getenv("MONGO_PASSWORD")
-        cluster = os.getenv("MONGO_CLUSTER")
-        app_name = os.getenv("MONGO_APP_NAME")
+        # Support simple MONGO_URI or individual credentials
+        mongo_uri = os.getenv("MONGO_URI")
+        
+        if mongo_uri:
+            # Simple URI format (for local MongoDB or pre-formatted connection strings)
+            self.uri = mongo_uri
+            # Extract database name from URI or use default
+            self.db_name = os.getenv("MONGO_DB_NAME", "ai_interview")
+        else:
+            # MongoDB Atlas format with individual credentials
+            self.db_name = os.getenv("MONGO_DB_NAME", "ai_interview")
+            username = quote_plus(os.getenv("MONGO_USER", ""))
+            password = os.getenv("MONGO_PASSWORD", "")
+            cluster = os.getenv("MONGO_CLUSTER", "localhost")
+            app_name = os.getenv("MONGO_APP_NAME", "HRLMS")
 
-        self.uri = (
-            f"mongodb+srv://{username}:{password}@{cluster}/"
-            f"?retryWrites=true&w=majority&appName={app_name}"
-        )
+            self.uri = (
+                f"mongodb+srv://{username}:{password}@{cluster}/"
+                f"?retryWrites=true&w=majority&appName={app_name}"
+            )
 
     async def connect(self):
         """Connect to MongoDB and test connection"""

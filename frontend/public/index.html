@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Interview - AI Interviewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .config-item {
+            margin-bottom: 15px;
+        }
+
+        .config-item label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .config-item input,
+        .config-item select,
+        .config-item textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .config-item textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .file-upload-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-upload-input {
+            display: none;
+        }
+
+        .file-upload-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            background: white;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload-label:hover {
+            background: #f5f7ff;
+            border-color: #764ba2;
+        }
+
+        .file-upload-label.has-file {
+            border-style: solid;
+            background: #e3f2fd;
+        }
+
+        .file-name {
+            margin-left: 10px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .status-section {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .status-dot.connected {
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-start {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-start:hover:not(:disabled) {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .btn-stop {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-stop:hover:not(:disabled) {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+
+        .transcript-section {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .transcript-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            line-height: 1.5;
+        }
+
+        .message.user {
+            background: #e3f2fd;
+            margin-left: 20px;
+        }
+
+        .message.ai {
+            background: #f3e5f5;
+            margin-right: 20px;
+        }
+
+        .message-label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .message.user .message-label {
+            color: #1976d2;
+        }
+
+        .message.ai .message-label {
+            color: #7b1fa2;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, .3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .timer-display {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🎤 AI Mock Interview</h1>
+
+        <div class="info-box">
+            ℹ️ API Key is securely stored on the server. Fill in your details and start your interview!
+        </div>
+
+        <div class="config-section">
+            <h3 style="margin-bottom: 15px; color: #333;">Candidate Information</h3>
+
+            <div class="config-item">
+                <label>Name: *</label>
+                <input type="text" id="candidateName" placeholder="Enter your full name" required>
+            </div>
+
+            <div class="config-item">
+                <label>Job Description: *</label>
+                <textarea id="jobDescription" placeholder="Paste the job description here..." required></textarea>
+            </div>
+
+            <div class="config-item">
+                <label>Resume: *</label>
+                <div class="file-upload-wrapper">
+                    <input type="file" id="resumeUpload" class="file-upload-input" accept=".pdf,.doc,.docx,.txt">
+                    <label for="resumeUpload" class="file-upload-label" id="fileLabel">
+                        <span>📄</span>
+                        <span class="file-name">Click to upload resume (PDF, DOC, DOCX, TXT)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <h3 style="margin-bottom: 15px; color: #333;">Interview Configuration</h3>
+
+            <div class="config-item">
+                <label>Role:</label>
+                <input type="text" id="role" value="Senior Software Engineer">
+            </div>
+
+            <div class="config-item">
+                <label>Interview Type:</label>
+                <select id="interviewType">
+                    <option value="technical">Technical Interview</option>
+                    <option value="behavioral">Behavioral Interview</option>
+                    <option value="system-design">System Design</option>
+                </select>
+            </div>
+
+            <div class="config-item">
+                <label>Duration (minutes):</label>
+                <input type="number" id="duration" value="15" min="5" max="60">
+            </div>
+
+            <div class="config-item">
+                <label>Interviewer: *</label>
+                <select id="interviewer">
+                    <option value="">Loading interviewers...</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="status-section">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div id="sessionInfo" style="font-size: 14px; color: #666;"></div>
+            <div id="timerDisplay" class="timer-display"></div>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+
+        <div class="controls">
+            <button class="btn-start" id="startBtn">
+                <span>▶️</span> Start Interview
+            </button>
+            <button class="btn-stop" id="stopBtn" disabled>
+                <span>⏹️</span> End Interview
+            </button>
+        </div>
+
+        <div class="transcript-section">
+            <div class="transcript-title">Interview Transcript</div>
+            <div id="transcript"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const FASTAPI_BASE_URL = 'http://localhost:8001';
+        const NODEJS_BASE_URL = 'http://localhost:3000';
+
+        class MockInterviewWebRTC {
+            constructor() {
+                this.peerConnection = null;
+                this.dataChannel = null;
+                this.audioElement = null;
+                this.isConnected = false;
+                this.sessionId = null;
+                this.currentAITranscript = '';
+                this.resumeFile = null;
+                this.interviewStartTime = null;
+                this.interviewTimer = null;
+                this.durationMinutes = 15;
+                this.interviewers = [];
+                this.conversationHistory = [];
+
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.statusDot = document.getElementById('statusDot');
+                this.statusText = document.getElementById('statusText');
+                this.transcript = document.getElementById('transcript');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.successMessage = document.getElementById('successMessage');
+                this.sessionInfo = document.getElementById('sessionInfo');
+                this.timerDisplay = document.getElementById('timerDisplay');
+                this.resumeUpload = document.getElementById('resumeUpload');
+                this.fileLabel = document.getElementById('fileLabel');
+                this.interviewerSelect = document.getElementById('interviewer');
+
+                this.initEventListeners();
+                this.loadInterviewers();
+                this.checkServerHealth();
+            }
+
+            initEventListeners() {
+                this.startBtn.addEventListener('click', () => this.startInterview());
+                this.stopBtn.addEventListener('click', () => this.stopInterview());
+
+                this.resumeUpload.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        this.resumeFile = file;
+                        this.fileLabel.classList.add('has-file');
+                        this.fileLabel.innerHTML = `<span>✅</span><span class="file-name">${file.name}</span>`;
+                    }
+                });
+            }
+
+            async loadInterviewers() {
+                try {
+                    const response = await fetch(`${FASTAPI_BASE_URL}/aiInterviewManagement/interviewers`);
+                    const result = await response.json();
+
+                    if (result.Success && result.Data) {
+                        this.interviewers = result.Data;
+                        this.populateInterviewerDropdown();
+                    }
+                } catch (error) {
+                    console.error('Failed to load interviewers:', error);
+                    this.interviewerSelect.innerHTML = '<option value="">Failed to load interviewers</option>';
+                }
+            }
+
+            populateInterviewerDropdown() {
+                this.interviewerSelect.innerHTML = this.interviewers.map(interviewer =>
+                    `<option value="${interviewer.id}">${interviewer.name} (${interviewer.gender}, ${interviewer.accent})</option>`
+                ).join('');
+            }
+
+            async checkServerHealth() {
+                try {
+                    const response = await fetch(`${FASTAPI_BASE_URL}/`);
+                    const data = await response.json();
+
+                    if (data.message) {
+                        this.showSuccess('FastAPI server connected and ready!');
+                        setTimeout(() => this.hideSuccess(), 3000);
+                    }
+                } catch (error) {
+                    this.showError('Cannot connect to FastAPI server. Please ensure it is running on port 8001.');
+                }
+            }
+
+            validateInputs() {
+                const name = document.getElementById('candidateName').value.trim();
+                const jobDesc = document.getElementById('jobDescription').value.trim();
+                const interviewerId = this.interviewerSelect.value;
+
+                if (!name) {
+                    throw new Error('Please enter your name');
+                }
+
+                if (!jobDesc) {
+                    throw new Error('Please provide a job description');
+                }
+
+                if (!this.resumeFile) {
+                    throw new Error('Please upload your resume');
+                }
+
+                if (!interviewerId) {
+                    throw new Error('Please select an interviewer');
+                }
+
+                return { name, jobDesc, interviewerId };
+            }
+
+            async startInterview() {
+                try {
+                    const { name, jobDesc, interviewerId } = this.validateInputs();
+
+                    this.startBtn.disabled = true;
+                    this.startBtn.innerHTML = '<span class="loading"></span> Connecting...';
+                    this.updateStatus('Connecting...', false);
+                    this.hideError();
+                    this.hideSuccess();
+
+                    const role = document.getElementById('role').value;
+                    this.durationMinutes = parseInt(document.getElementById('duration').value);
+
+                    // Create FormData for FastAPI multipart/form-data endpoint
+                    const formData = new FormData();
+                    formData.append('interview_role', role);
+                    formData.append('duration_minutes', this.durationMinutes);
+                    formData.append('interviewer_id', interviewerId);
+                    formData.append('job_description', jobDesc);
+                    formData.append('resume_file', this.resumeFile);
+                    formData.append('microphone_status', true);
+                    formData.append('camera_status', true);
+
+                    const sessionResponse = await fetch(`${FASTAPI_BASE_URL}/aiInterviewManagement/realtime-interview/session`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!sessionResponse.ok) {
+                        const errorData = await sessionResponse.json();
+                        throw new Error(errorData.Message || 'Failed to create session');
+                    }
+
+                    const result = await sessionResponse.json();
+
+                    if (!result.Success) {
+                        throw new Error(result.Message || 'Failed to create session');
+                    }
+
+                    const sessionData = result.Data;
+                    this.sessionId = sessionData.session_id;
+
+                    await this.initWebRTC(sessionData.ephemeral_token);
+
+                    this.stopBtn.disabled = false;
+                    this.sessionInfo.textContent = `Session ID: ${this.sessionId} | Candidate: ${name}`;
+                    this.startBtn.innerHTML = '<span>▶️</span> Start Interview';
+
+                    this.startInterviewTimer();
+
+                } catch (error) {
+                    console.error('Error starting interview:', error);
+                    this.showError(`Failed to start: ${error.message}`);
+                    this.startBtn.disabled = false;
+                    this.startBtn.innerHTML = '<span>▶️</span> Start Interview';
+                    this.updateStatus('Connection failed', false);
+                }
+            }
+
+            startInterviewTimer() {
+                this.interviewStartTime = Date.now();
+                const endTime = this.interviewStartTime + (this.durationMinutes * 60 * 1000);
+
+                this.interviewTimer = setInterval(() => {
+                    const now = Date.now();
+                    const remaining = endTime - now;
+
+                    if (remaining <= 0) {
+                        clearInterval(this.interviewTimer);
+                        this.interviewTimer = null;
+                        this.timerDisplay.textContent = 'Time expired - Please wrap up';
+                        this.timerDisplay.style.color = '#f44336';
+                        this.timerDisplay.style.fontWeight = '600';
+
+                        // Send a message to AI to wrap up gracefully
+                        if (this.isConnected) {
+                            this.sendEvent({
+                                type: 'conversation.item.create',
+                                item: {
+                                    type: 'message',
+                                    role: 'user',
+                                    content: [{
+                                        type: 'input_text',
+                                        text: '[System: The allocated interview time has ended. Please wrap up the conversation professionally by thanking the candidate and providing next steps.]'
+                                    }]
+                                }
+                            });
+
+                            this.sendEvent({
+                                type: 'response.create'
+                            });
+                        }
+
+                        this.showSuccess('Interview time completed! The AI will wrap up the conversation.');
+                        return;
+                    }
+
+                    const minutes = Math.floor(remaining / 60000);
+                    const seconds = Math.floor((remaining % 60000) / 1000);
+                    this.timerDisplay.textContent = `Time remaining: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    this.timerDisplay.style.color = '#666';
+
+                    // 2 minute warning
+                    if (remaining <= 120000 && remaining > 119000 && !this.twoMinuteWarningShown) {
+                        this.twoMinuteWarningShown = true;
+                        this.showSuccess('Two minutes remaining - prepare to wrap up');
+                        setTimeout(() => this.hideSuccess(), 3000);
+                    }
+
+                    // 1 minute warning
+                    if (remaining <= 60000 && !this.oneMinuteWarningShown) {
+                        this.oneMinuteWarningShown = true;
+                        this.showSuccess('One minute remaining!');
+                        setTimeout(() => this.hideSuccess(), 3000);
+
+                        // Notify AI to start wrapping up
+                        if (this.isConnected) {
+                            this.sendEvent({
+                                type: 'conversation.item.create',
+                                item: {
+                                    type: 'message',
+                                    role: 'user',
+                                    content: [{
+                                        type: 'input_text',
+                                        text: '[System: One minute remaining. Start concluding the interview in the next response.]'
+                                    }]
+                                }
+                            });
+                        }
+                    }
+                }, 1000);
+            }
+
+            async initWebRTC(ephemeralToken) {
+                this.peerConnection = new RTCPeerConnection();
+                this.audioElement = document.createElement('audio');
+                this.audioElement.autoplay = true;
+
+                this.peerConnection.ontrack = (event) => {
+                    console.log('Received remote track:', event.track.kind);
+                    this.audioElement.srcObject = event.streams[0];
+                };
+
+                this.peerConnection.onconnectionstatechange = () => {
+                    console.log('Connection state:', this.peerConnection.connectionState);
+                    if (this.peerConnection.connectionState === 'failed') {
+                        this.showError('WebRTC connection failed');
+                        this.stopInterview();
+                    }
+                };
+
+                this.dataChannel = this.peerConnection.createDataChannel('oai-events');
+
+                this.dataChannel.onopen = () => {
+                    console.log('Data channel opened');
+                    this.isConnected = true;
+                    this.updateStatus('Connected - Ready to speak!', true);
+                    this.sendSessionUpdate();
+                };
+
+                this.dataChannel.onclose = () => {
+                    console.log('Data channel closed');
+                    this.isConnected = false;
+                    this.updateStatus('Disconnected', false);
+                };
+
+                this.dataChannel.onerror = (error) => {
+                    console.error('Data channel error:', error);
+                    this.showError('Data channel error occurred');
+                };
+
+                this.dataChannel.onmessage = (event) => {
+                    try {
+                        const serverEvent = JSON.parse(event.data);
+                        this.handleServerEvent(serverEvent);
+                    } catch (error) {
+                        console.error('Error parsing server event:', error);
+                    }
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                stream.getTracks().forEach(track => {
+                    this.peerConnection.addTrack(track, stream);
+                });
+
+                const offer = await this.peerConnection.createOffer();
+                await this.peerConnection.setLocalDescription(offer);
+
+                const sdpResponse = await fetch('https://api.openai.com/v1/realtime', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${ephemeralToken}`,
+                        'Content-Type': 'application/sdp'
+                    },
+                    body: offer.sdp
+                });
+
+                if (!sdpResponse.ok) {
+                    throw new Error('Failed to connect to OpenAI Realtime API');
+                }
+
+                const answerSdp = await sdpResponse.text();
+                await this.peerConnection.setRemoteDescription({
+                    type: 'answer',
+                    sdp: answerSdp
+                });
+
+                console.log('WebRTC connection established');
+            }
+
+            sendSessionUpdate() {
+                const name = document.getElementById('candidateName').value;
+                const role = document.getElementById('role').value;
+                const interviewType = document.getElementById('interviewType').value;
+                const jobDesc = document.getElementById('jobDescription').value;
+
+                const instructions = `You are an AI interviewer conducting a ${interviewType} interview for the position of ${role}. 
+The candidate's name is ${name}.
+The interview should last approximately ${this.durationMinutes} minutes.
+
+Job Description:
+${jobDesc}
+
+Note: The candidate has uploaded their resume (${this.resumeFile.name}).
+
+Start by greeting ${name} warmly and asking them to introduce themselves briefly.
+Then proceed with relevant questions based on the interview type and job description.
+Be professional, encouraging, and provide constructive feedback when appropriate.
+Ask follow-up questions to dive deeper into their responses.
+Keep track of time and ensure you cover key areas within the ${this.durationMinutes}-minute timeframe.
+At the end, thank them and let them know they'll hear back soon.`;
+
+                this.sendEvent({
+                    type: 'session.update',
+                    session: {
+                        instructions: instructions,
+                        input_audio_transcription: {
+                            model: 'whisper-1'
+                        },
+                        turn_detection: {
+                            type: 'server_vad',
+                            threshold: 0.3, //lower threshold for late detection
+                            prefix_padding_ms: 300,
+                            silence_duration_ms: 1500
+                        }
+                    }
+                });
+
+                this.sendEvent({
+                    type: 'response.create'
+                });
+            }
+
+            sendEvent(event) {
+                if (this.dataChannel && this.dataChannel.readyState === 'open') {
+                    this.dataChannel.send(JSON.stringify(event));
+                    console.log('Sent event:', event.type);
+                }
+            }
+
+            handleServerEvent(event) {
+                console.log('Server event:', event.type);
+
+                switch (event.type) {
+                    case 'session.created':
+                        console.log('Session created:', event.session);
+                        break;
+
+                    case 'session.updated':
+                        console.log('Session updated');
+                        break;
+
+                    case 'conversation.item.created':
+                        if (event.item.type === 'message') {
+                            this.handleMessage(event.item);
+                        }
+                        break;
+
+                    case 'conversation.item.input_audio_transcription.completed':
+                        this.addTranscript('user', event.transcript);
+                        break;
+
+                    case 'response.audio_transcript.delta':
+                        this.currentAITranscript += event.delta;
+                        break;
+
+                    case 'response.audio_transcript.done':
+                        if (this.currentAITranscript) {
+                            this.addTranscript('ai', this.currentAITranscript);
+                            this.currentAITranscript = '';
+                        }
+                        break;
+
+                    case 'response.done':
+                        console.log('Response completed');
+                        break;
+
+                    case 'error':
+                        console.error('Server error:', event.error);
+                        this.showError(`AI Error: ${event.error.message}`);
+                        break;
+                }
+            }
+
+            handleMessage(item) {
+                if (item.role === 'assistant' && item.content) {
+                    item.content.forEach(content => {
+                        if (content.type === 'audio' && content.transcript) {
+                            this.addTranscript('ai', content.transcript);
+                        }
+                    });
+                }
+            }
+
+            addTranscript(role, text) {
+                if (!text || text.trim() === '') return;
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}`;
+
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'message-label';
+                labelDiv.textContent = role === 'user' ? 'You' : 'AI Interviewer';
+
+                const textDiv = document.createElement('div');
+                textDiv.textContent = text;
+
+                messageDiv.appendChild(labelDiv);
+                messageDiv.appendChild(textDiv);
+
+                this.transcript.appendChild(messageDiv);
+                this.transcript.scrollTop = this.transcript.scrollHeight;
+
+                // Track conversation history for saving to backend
+                this.conversationHistory.push({
+                    role: role === 'user' ? 'user' : 'assistant',
+                    content: text,
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            async stopInterview() {
+                if (this.interviewTimer) {
+                    clearInterval(this.interviewTimer);
+                    this.interviewTimer = null;
+                }
+
+                // Save conversation to FastAPI backend
+                if (this.sessionId && this.conversationHistory.length > 0) {
+                    try {
+                        const conversationFormData = new FormData();
+                        conversationFormData.append('session_id', this.sessionId);
+                        conversationFormData.append('conversation_json', JSON.stringify(this.conversationHistory));
+
+                        await fetch(`${FASTAPI_BASE_URL}/aiInterviewManagement/realtime-interview/update-conversation`, {
+                            method: 'POST',
+                            body: conversationFormData
+                        });
+
+                        console.log('Conversation saved to backend');
+                    } catch (error) {
+                        console.error('Failed to save conversation:', error);
+                    }
+
+                    // End the interview session
+                    try {
+                        const endFormData = new FormData();
+                        endFormData.append('session_id', this.sessionId);
+
+                        await fetch(`${FASTAPI_BASE_URL}/aiInterviewManagement/realtime-interview/end`, {
+                            method: 'POST',
+                            body: endFormData
+                        });
+
+                        console.log('Interview session ended on backend');
+                    } catch (error) {
+                        console.error('Failed to end session on backend:', error);
+                    }
+                }
+
+                if (this.dataChannel) {
+                    this.dataChannel.close();
+                }
+
+                if (this.peerConnection) {
+                    this.peerConnection.close();
+                }
+
+                if (this.audioElement) {
+                    this.audioElement.srcObject = null;
+                }
+
+                this.isConnected = false;
+                this.updateStatus('Disconnected', false);
+                this.startBtn.disabled = false;
+                this.startBtn.innerHTML = '<span>▶️</span> Start Interview';
+                this.stopBtn.disabled = true;
+                this.sessionInfo.textContent = '';
+                this.timerDisplay.textContent = '';
+                this.oneMinuteWarningShown = false;
+                this.twoMinuteWarningShown = false;
+
+                this.showSuccess('Interview ended. Thank you!');
+            }
+
+            updateStatus(text, connected) {
+                this.statusText.textContent = text;
+                if (connected) {
+                    this.statusDot.classList.add('connected');
+                } else {
+                    this.statusDot.classList.remove('connected');
+                }
+            }
+
+            showError(message) {
+                this.errorMessage.textContent = message;
+                this.errorMessage.style.display = 'block';
+            }
+
+            hideError() {
+                this.errorMessage.style.display = 'none';
+            }
+
+            showSuccess(message) {
+                this.successMessage.textContent = message;
+                this.successMessage.style.display = 'block';
+            }
+
+            hideSuccess() {
+                this.successMessage.style.display = 'none';
+            }
+        }
+
+        const app = new MockInterviewWebRTC();
+    </script>
+</body>
+
+</html>

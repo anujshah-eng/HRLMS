@@ -1,0 +1,105 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>New {{ content_title }} Published</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      color: #333;
+      line-height: 1.6;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      background-color: #fff;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      font-size: 24px;
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .highlight {
+      font-weight: bold;
+      color: #1976D2;
+    }
+    .content-type-icon {
+      font-size: 36px;
+      text-align: center;
+      margin: 15px 0;
+    }
+    .btn {
+      display: inline-block;
+      background-color: #007BFF;
+      padding: 12px 24px;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+    .btn:hover {
+      background-color: #0056b3;
+    }
+    .footer {
+      font-size: 12px;
+      color: #777;
+      margin-top: 30px;
+      border-top: 1px solid #eee;
+      padding-top: 15px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Mind Mentor</div>
+
+    <div class="content-type-icon">
+      {% if content_type == "course" %}
+        📘
+      {% elif content_type == "quiz" %}
+        🧠
+      {% elif content_type == "announcement" %}
+        📢
+      {% else %}
+        🔔
+      {% endif %}
+    </div>
+
+    <h3>New {{ content_type | title }} Published!</h3>
+
+    <p>Hi {{ student_name }},</p>
+
+    <p>
+      <span class="highlight">{{ teacher_name }}</span>
+      has just published a new <strong>{{ content_type }}</strong> in your classroom
+      <strong>"{{ classroom_name }}"</strong>:
+    </p>
+
+    <h4 style="margin: 10px 0; color: #2c3e50;">{{ content_title }}</h4>
+
+    <p style="text-align: center;">
+      <a href="{{ link }}" class="btn">View {{ content_type | title }}</a>
+    </p>
+
+    <p>You can access it anytime from your dashboard.</p>
+
+    <div class="footer">
+      <p>This is an automated message. Please do not reply to this email.</p>
+      <p>If you have any questions, please contact our support team.</p>
+      <p>© 2025 MindMentor. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

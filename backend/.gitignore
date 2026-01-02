@@ -1,0 +1,10 @@
+venv
+**/__pycache__/
+.env
+.vscode/
+envs/*.env*
+*.log
+uv.lock
+docs
+output
+vector_db

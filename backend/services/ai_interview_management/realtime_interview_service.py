@@ -688,7 +688,8 @@ class RealtimeInterviewService:
         if not session:
             raise CustomException("Session not found", status_code=status.HTTP_404_NOT_FOUND)
 
-        if session.get("status") != "completed":
+        # Allow evaluation for both "completed" and "evaluated" status (for re-evaluation)
+        if session.get("status") not in ["completed", "evaluated"]:
             raise CustomException("Interview not completed yet", status_code=status.HTTP_400_BAD_REQUEST)
 
         # Get conversation transcript

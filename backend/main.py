@@ -54,7 +54,7 @@ async def lifespan(fastapi_app: FastAPI):
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Acelucid HRLMS",
+    title="Acelucid HRMS",
     version="1.0",
     description="AI Interview Management",
     lifespan=lifespan
@@ -89,7 +89,7 @@ app.include_router(
 async def root():
     """Root endpoint with API information."""
     return {
-        "message": "Welcome to Acelucid MindMentor API",
+        "message": "Welcome to Acelucid HRMS API",
         "version": "1.0",
         "docs": "/docs",
         "redoc": "/redoc"

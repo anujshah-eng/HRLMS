@@ -5,6 +5,7 @@ Handles business logic for creating, managing, and evaluating realtime interview
 import os
 import uuid
 import logging
+import json
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -24,6 +25,7 @@ class RealtimeInterviewService:
     def __init__(self):
         self.repo = AIInterviewRolesRepository()
         self.mongo_repo = RealtimeInterviewMongoRepository()
+        self.agent = AIInterviewAgent()
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         # self.transcription_model = os.getenv("TRANSCRIPTION_MODEL", "whisper-1")
         # Transcription model configuration
@@ -45,14 +47,14 @@ class RealtimeInterviewService:
     async def create_ephemeral_session(
         self,
         mongodb_collection,
-        interview_role: str,
+        role_id: int,
         company_name: str,
         interview_round: str,
         duration_minutes: int,
         interviewer_id: int,
         user_id: str,
         job_description: Optional[str] = None,
-        resume_file: Optional[UploadFile] = None,
+        skills: Optional[str] = None,
         # Required compatibility test results
         microphone_status: bool = True,
         camera_status: bool = True,
@@ -154,7 +156,93 @@ class RealtimeInterviewService:
             interview_round_obj = MockInterviewRound(interview_round)
 
         # Extract resume if provided
-        resume_context = await self._extract_resume(resume_file, session_id) if resume_file else None
+        resume_context = None
+
+        # --- Role & Question Management ---
+        parsed_skills = []
+        if skills:
+            try:
+                parsed_skills = json.loads(skills)
+            except Exception as e:
+                logger.error(f"Failed to parse skills JSON: {e}")
+
+
+
+        # Find Role by ID
+        role_obj = await self.repo.get_role_by_id(role_id)
+        if not role_obj:
+             raise CustomException("Role not found", status_code=status.HTTP_404_NOT_FOUND)
+        
+        interview_role = role_obj.title
+        # Use role description if job description not provided
+        if not job_description and role_obj.description:
+            job_description = role_obj.description
+
+        final_questions_list = []
+
+        # Fetch questions from DB for the role
+        logger.info(f"Attempting to fetch questions for role_id: {role_id} (type: {type(role_id)})")
+        db_questions = await self.repo.get_all_questions(role_id=role_id)
+        
+        if db_questions:
+            # Use questions from DB
+            logger.info(f"Using {len(db_questions)} questions from database for role {role_id}")
+            # Convert to list of dicts for consistency
+            for q in db_questions:
+                final_questions_list.append({
+                    "question_text": q.question_text,
+                    "topic": q.topic,
+                    "id": q.id
+                })
+        else:
+            # Check if there are ANY questions (including inactive) for debugging
+            all_questions = await self.repo.get_all_questions(role_id=role_id, is_active=None)
+            if all_questions:
+                logger.warning(f"Found {len(all_questions)} INACTIVE questions for role {role_id}, but 0 active ones. Using inactive/all questions as fallback.")
+                for q in all_questions:
+                    final_questions_list.append({
+                        "question_text": q.question_text,
+                        "topic": q.topic,
+                        "id": q.id
+                    })
+            else:
+                logger.warning(f"No questions found in database for role_id {role_id} (active or inactive). Falling back to LLM generation.")
+                # Generate questions via LLM
+                logger.info("Generating questions via LLM...")
+                try:
+                    # Enhance Job Description with Skills for better context
+                    enhanced_jd = job_description or ""
+                    if parsed_skills:
+                        enhanced_jd += f"\nRequired Skills: {', '.join(parsed_skills)}"
+                    
+                    generated = await self.agent.generate_questions(
+                        role=interview_role,
+                        interview_round=interview_round_obj.name,
+                        difficulty="Medium", 
+                        num_questions=5, # approx fit for typical duration
+                        company_name=company_name,
+                        resume_text=resume_context,
+                        job_description=enhanced_jd
+                    )
+                    final_questions_list = generated
+                    
+                    # Questions used for this session only, not saving to DB
+                    
+                except Exception as e:
+                    logger.error(f"Failed to generate questions: {e}")
+                    # Fallback: empty list (will use standard adaptive flow)
+
+        # Format mandatory questions as JSON for system prompt
+        mandatory_questions_text = ""
+        if final_questions_list:
+            import json
+            questions_data = []
+            for q in final_questions_list:
+                 q_text = q.get("question_text") or q.get("question")
+                 if q_text:
+                     questions_data.append(q_text)
+            
+            mandatory_questions_text = f"MANDATORY_QUESTIONS_JSON_DATA:\n{json.dumps(questions_data, indent=2)}"
 
         # Create system instructions
         system_instructions = self._create_system_instructions(
@@ -163,7 +251,8 @@ class RealtimeInterviewService:
             interview_round=interview_round_obj.name,
             duration=duration_minutes,
             resume_context=resume_context,
-            job_description=job_description
+            job_description=job_description,
+            mandatory_questions=mandatory_questions_text
         )
 
         # Create ephemeral token from OpenAI with interviewer's voice
@@ -190,6 +279,7 @@ class RealtimeInterviewService:
             "_id": session_id,
             "session_id": session_id,
             "user_id": user_id,
+            "role_id": role_id, # Store role_id
             "interview_role": interview_role,
             "company_name": company_name,
             "interview_round": interview_round,
@@ -218,7 +308,9 @@ class RealtimeInterviewService:
                 "evaluation_tokens": 0,  # Will be updated after evaluation
                 "total_tokens": system_instruction_tokens,
                 "estimated_cost_usd": 0.0  # Will be calculated after interview
-            }
+            },
+            "skills": parsed_skills,
+            "questions": final_questions_list, # Store questions being used
         }
 
         if mongodb_collection is not None:
@@ -235,6 +327,7 @@ class RealtimeInterviewService:
             "model": "gpt-4o-mini-realtime-preview-2024-12-17",
             "voice": interviewer.voice_id,
             "expires_at": expires_at,
+            "questions": final_questions_list, # Return questions to frontend
             "interviewer": {
                 "id": interviewer.id,
                 "name": interviewer.name,
@@ -478,7 +571,8 @@ class RealtimeInterviewService:
         interview_round: str,
         duration: int,
         resume_context: Optional[str] = None,
-        job_description: Optional[str] = None
+        job_description: Optional[str] = None,
+        mandatory_questions: Optional[str] = None
     ) -> str:
         """Create system instructions for the AI interviewer by loading from markdown file"""
 
@@ -488,7 +582,9 @@ class RealtimeInterviewService:
             context_parts.append(f"Candidate's Resume:\n{resume_context}")
         if job_description:
             context_parts.append(f"Job Description:\n{job_description}")
-
+        if mandatory_questions:
+            context_parts.append(mandatory_questions)
+        
         context_section = "\n\n".join(context_parts) if context_parts else "No additional context provided."
 
         # Load main instructions template from file
@@ -678,7 +774,7 @@ class RealtimeInterviewService:
             "total_cost_usd": round(interim_total_cost, 6)
         }
 
-    async def evaluate_interview(self, mongodb_collection, session_id: str):
+    async def evaluate_interview(self, mongodb_collection, session_id: str, passing_score: Optional[int] = None):
         """Evaluate completed interview session"""
         if mongodb_collection is None:
             raise CustomException("Database not available", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -708,7 +804,8 @@ class RealtimeInterviewService:
         # Evaluate the interview
         evaluation_data = await evaluation_service.evaluate_interview_session(
             session_data=session,
-            conversation_transcript=conversation
+            conversation_transcript=conversation,
+            passing_score=passing_score
         )
 
         # Store evaluation in database

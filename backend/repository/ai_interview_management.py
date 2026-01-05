@@ -136,11 +136,14 @@ class AIInterviewRolesRepository:
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {str(e)}")
 
-    async def get_all_questions(self, role_id: int | None = None, is_active: bool = True):
+    async def get_all_questions(self, role_id: int | None = None, is_active: bool | None = True):
         """Get all questions, optionally filtered by role_id"""
         try:
             async with db_resource_manager.async_session() as session:
-                query = select(AIInterviewQuestions).filter(AIInterviewQuestions.is_active == is_active)
+                query = select(AIInterviewQuestions)
+                
+                if is_active is not None:
+                    query = query.filter(AIInterviewQuestions.is_active == is_active)
                 
                 if role_id is not None:
                     query = query.filter(AIInterviewQuestions.role_id == role_id)

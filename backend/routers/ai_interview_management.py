@@ -282,12 +282,11 @@ async def delete_question(question_id: int):
 # Realtime Interview Endpoints
 @router.post("/realtime-interview/session", response_model=ResponseDto)
 async def create_ephemeral_session(
-    interview_role: str = Form(...),
+    role_id: int = Form(...),
     duration_minutes: int = Form(..., ge=5, le=30),
-    interviewer_id: int = Form(...),  # ID of selected interviewer
+    interviewer_id: int = Form(...),
     job_description: Optional[str] = Form(None),
-    resume_file: Optional[UploadFile] = File(None),
-    # Required: Compatibility test results (must pass all tests)
+    skills: Optional[str] = Form(None),  # JSON string of list[str]
     microphone_status: bool = Form(...),
     camera_status: bool = Form(...),
     # internet_status: bool = Form(...),
@@ -305,6 +304,12 @@ async def create_ephemeral_session(
     - camera_status: MUST be true
 
     **If ANY compatibility check fails, session will NOT be created.**
+
+    **Optional Configuration:**
+    - skills: JSON list of skills (e.g. ["React", "Python"])
+    - questions: JSON list of specific questions to ask
+    - passing_score: Passing score for the interview
+    - valid_until: Validity date string
 
     **Recommended Flow:**
 
@@ -332,14 +337,14 @@ async def create_ephemeral_session(
     try:
         result = await realtime_service.create_ephemeral_session(
             mongodb_collection=mongodb_collection,
-            interview_role=interview_role,
+            role_id=role_id,
             company_name="Acelucid",  # Hardcoded company
             interview_round="Technical Round",  # Hardcoded round
             duration_minutes=duration_minutes,
             interviewer_id=interviewer_id,
             user_id=None,  # POC: No authentication required
             job_description=job_description,
-            resume_file=resume_file,
+            skills=skills,
             # Required compatibility params
             microphone_status=microphone_status,
             camera_status=camera_status,
@@ -456,6 +461,7 @@ async def update_conversation(
 @router.post("/realtime-interview/evaluate", response_model=ResponseDto)
 async def evaluate_interview(
     session_id: str = Form(...),
+    passing_score: Optional[int] = Form(None),
     
     mongodb_collection = Depends(get_realtime_interview_collection)
 ):
@@ -471,7 +477,8 @@ async def evaluate_interview(
     try:
         evaluation_data = await realtime_service.evaluate_interview(
             mongodb_collection=mongodb_collection,
-            session_id=session_id
+            session_id=session_id,
+            passing_score=passing_score
         )
 
         return ResponseDto(

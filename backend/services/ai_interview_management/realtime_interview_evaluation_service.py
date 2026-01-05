@@ -4,7 +4,7 @@ Evaluates completed real-time interviews and provides comprehensive feedback
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import datetime, timezone
 
 from agents.ai_interview.interview_agent import AIInterviewAgent
@@ -46,7 +46,8 @@ class RealtimeInterviewEvaluationService:
     async def evaluate_interview_session(
         self,
         session_data: Dict,
-        conversation_transcript: List[Dict]
+        conversation_transcript: List[Dict],
+        passing_score: Optional[int] = None
     ) -> Dict:
         """
         Evaluate complete interview session with question-by-question and overall analysis.
@@ -225,6 +226,7 @@ class RealtimeInterviewEvaluationService:
                 "questions": question_evaluations,
                 "overall_evaluation": {
                     "total_score": overall_evaluation.get("total_score", 0),
+                    "result": ("pass" if passing_score is not None and overall_evaluation.get("total_score", 0) >= passing_score else "fail") if passing_score is not None else None,
                     "feedback_label": overall_evaluation.get("feedback_label", "Fair"),
                     "key_strengths": overall_evaluation.get("key_strengths", []),
                     "focus_areas": overall_evaluation.get("focus_areas", []),

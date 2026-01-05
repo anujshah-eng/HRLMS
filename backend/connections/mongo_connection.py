@@ -28,7 +28,7 @@ class MotorMongoDBResourceManager:
             # MongoDB Atlas format with individual credentials
             self.db_name = os.getenv("MONGO_DB_NAME", "ai_interview")
             username = quote_plus(os.getenv("MONGO_USER", ""))
-            password = os.getenv("MONGO_PASSWORD", "")
+            password = quote_plus(os.getenv("MONGO_PASSWORD", ""))
             cluster = os.getenv("MONGO_CLUSTER", "localhost")
             app_name = os.getenv("MONGO_APP_NAME", "HRLMS")
 

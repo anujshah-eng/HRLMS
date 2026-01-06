@@ -32,6 +32,7 @@ dependencies = [
     "databases==0.9.0",
     "psycopg2-binary>=2.9.10",
     "asyncpg==0.30.0",
+    "pymysql==1.0.2",
     "pymongo==4.7.2",
     # Messaging/Notifications
     "pyfcm==2.0.4",
@@ -48,6 +49,7 @@ dependencies = [
     "aioboto3>=13.1.1",
     "aiofiles>=24.1.0",
     "httpx>=0.28.1",
+    "aiomysql>=0.3.2",
 ]
 
 [tool.setuptools]

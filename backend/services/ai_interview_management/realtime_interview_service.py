@@ -98,7 +98,8 @@ class RealtimeInterviewService:
             
             mock_data = mock_interviewers.get(str(interviewer_id))
             if not mock_data:
-                raise CustomException("Interviewer not found", status_code=status.HTTP_404_NOT_FOUND)
+                logger.warning(f"Interviewer ID {interviewer_id} not found in mocks, defaulting to ID 1")
+                mock_data = mock_interviewers.get("1")
             
             # Create a mock interviewer object with required attributes
             class MockInterviewer:

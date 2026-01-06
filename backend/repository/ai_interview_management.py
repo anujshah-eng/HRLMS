@@ -2,12 +2,12 @@ import os
 from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
-from connections.postgres_connection import DBResourceManager
+from connections.mysql_connection import MySQLResourceManager as DBResourceManager
 from models.ai_interview_model import (
     AIInterviewers
 )
 
-db_resource_manager = DBResourceManager(db_key=os.getenv("POSTGRES_DB"))
+db_resource_manager = DBResourceManager()
 
 class AIInterviewRolesRepository:
     def __init__(self):

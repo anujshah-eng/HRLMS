@@ -7,7 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from config.env_loader import load_env  
 from config.env_validator import validate_required_env_vars
 from routers import ai_interview_management
-from connections.postgres_connection import DBResourceManager
+from connections.mysql_connection import MySQLResourceManager as DBResourceManager
 from connections.mongo_connection import MotorMongoDBResourceManager
 
 # Configure logging

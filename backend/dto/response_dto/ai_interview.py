@@ -2,33 +2,13 @@ from pydantic import BaseModel, field_serializer
 from datetime import datetime
 from uuid import UUID
 
-class AIInterviewRoleResponseDTO(BaseModel):
-    id: int
-    title: str
-    description: str | None
-
-    class Config:
-        from_attributes = True
-
-class InterviewQuestionResponseDTO(BaseModel):
-    id: int
-    question_text: str
-    topic: str | None
-    role_id: int | None
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime | None
-
-    class Config:
-        from_attributes = True
-
 # Real-time Interview Session Response DTOs
 class InterviewSessionResponseDTO(BaseModel):
     """Response for interview session"""
     id: int
     session_id: str
     user_id: UUID | str  # Accept both UUID and string
-    role_id: int
+    role_title: str
     company_id: int | None
     interview_round_id: int
     avatar_id: int
@@ -66,6 +46,7 @@ class QuestionResponseDTO(BaseModel):
     question_text: str
     order: int
     topic: str | None
+    type: str | None = "general"
 
 class InterviewQuestionSetDTO(BaseModel):
     """Set of questions generated for interview"""

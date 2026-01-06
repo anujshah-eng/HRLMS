@@ -1,292 +1,22 @@
 from typing import Optional
 from fastapi import APIRouter, status, Depends, Form, UploadFile, File
 from dto.response_dto.response_dto import ResponseDto
-from dto.request_dto.ai_interview import (
-    AIInterviewRoleCreateDTO,
-    AIInterviewRoleUpdateDTO,
-    QuestionCreateDTO,
-    QuestionUpdateDTO
-)
-from services.ai_interview_management.ai_interview_management import AIInterviewRolesService
 from services.ai_interview_management.realtime_interview_service import RealtimeInterviewService
 from custom_utilities.custom_exception import CustomException
 from custom_utilities.dependencies import get_realtime_interview_collection
 
 router = APIRouter()
-service = AIInterviewRolesService()
 realtime_service = RealtimeInterviewService()
-
-# Role Management Endpoints (CRUD Order)
-@router.post("/createRole", response_model=ResponseDto, status_code=status.HTTP_201_CREATED)
-async def create_role(dto: AIInterviewRoleCreateDTO):
-    try:
-        role = await service.create_role(dto)
-        return ResponseDto(
-            Data=role,
-            Success=True,
-            Message="Role created successfully.",
-            Status=status.HTTP_201_CREATED
-        )
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@router.get("/getRoles", response_model=ResponseDto)
-async def list_roles():
-    try:
-        roles = await service.get_all_roles()
-        return ResponseDto(
-            Data=roles,
-            Success=True,
-            Message="Roles fetched successfully.",
-            Status=status.HTTP_200_OK
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@router.get("/role/{role_id}", response_model=ResponseDto)
-async def get_role(role_id: int):
-    try:
-        role = await service.get_role_by_id(role_id)
-        return ResponseDto(
-            Data=role,
-            Success=True,
-            Message="Role fetched successfully.",
-            Status=status.HTTP_200_OK
-        )
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@router.put("/role/{role_id}", response_model=ResponseDto)
-async def update_role(role_id: int, dto: AIInterviewRoleUpdateDTO):
-    try:
-        role = await service.update_role(role_id, dto)
-        return ResponseDto(
-            Data=role,
-            Success=True,
-            Message="Role updated successfully.",
-            Status=status.HTTP_200_OK
-        )
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@router.delete("/role/{role_id}", response_model=ResponseDto)
-async def delete_role(role_id: int):
-    try:
-        await service.delete_role(role_id)
-        return ResponseDto(
-            Data=None,
-            Success=True,
-            Message="Role deleted successfully.",
-            Status=status.HTTP_204_NO_CONTENT
-        )
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-
-
-# @router.get("/languages", response_model=ResponseDto)
-# async def get_languages():
-#     languages = await service.fetch_languages()
-#     return ResponseDto(
-#         Data=[LanguageDto.model_validate(lang) for lang in languages],
-#         Success=True,
-#         Message="Languages fetched successfully",
-#         Status=status.HTTP_200_OK
-#     )
-
-# @router.get("/avatars", response_model=ResponseDto)
-# async def get_avatars(language_id: int = None):
-#     avatars = await service.fetch_avatars(language_id)
-#     return ResponseDto(
-#         Data=[AvatarDto.model_validate(a) for a in avatars],
-#         Success=True,
-#         Message="Avatars fetched successfully",
-#         Status=status.HTTP_200_OK
-#     )
-
-# Question Management Endpoints
-@router.post("/questions", response_model=ResponseDto, status_code=status.HTTP_201_CREATED)
-async def create_question(dto: QuestionCreateDTO):
-    """
-    Create a new interview question.
-    
-    The question can be optionally linked to a specific role.
-    """
-    try:
-        question = await service.create_question(dto)
-        return ResponseDto(
-            Data=question,
-            Success=True,
-            Message="Question created successfully.",
-            Status=status.HTTP_201_CREATED
-        )
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@router.get("/questions", response_model=ResponseDto)
-async def list_questions(
-    role_id: Optional[int] = None,
-    
-):
-    """
-    List all active interview questions.
-    
-    Can be filtered by role_id to get questions for a specific role.
-    """
-    try:
-        questions = await service.get_all_questions(role_id=role_id)
-        return ResponseDto(
-            Data=questions,
-            Success=True,
-            Message="Questions fetched successfully.",
-            Status=status.HTTP_200_OK
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@router.put("/questions/{question_id}", response_model=ResponseDto)
-async def update_question(
-    question_id: int,
-    dto: QuestionUpdateDTO,
-    
-):
-    """
-    Update an existing interview question.
-    
-    All fields are optional. Only provided fields will be updated.
-    """
-    try:
-        question = await service.update_question(question_id, dto)
-        return ResponseDto(
-            Data=question,
-            Success=True,
-            Message="Question updated successfully.",
-            Status=status.HTTP_200_OK
-        )
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@router.delete("/questions/{question_id}", response_model=ResponseDto)
-async def delete_question(question_id: int):
-    """
-    Soft delete an interview question.
-    
-    The question is marked as inactive rather than being permanently deleted.
-    """
-    try:
-        await service.delete_question(question_id)
-        return ResponseDto(
-            Data=None,
-            Success=True,
-            Message="Question deleted successfully.",
-            Status=status.HTTP_204_NO_CONTENT
-        )
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 # Realtime Interview Endpoints
 @router.post("/realtime-interview/session", response_model=ResponseDto)
 async def create_ephemeral_session(
-    role_id: int = Form(...),
+    role_title: str = Form(...),
     duration_minutes: int = Form(..., ge=5, le=30),
     interviewer_id: int = Form(...),
     job_description: Optional[str] = Form(None),
     skills: Optional[str] = Form(None),  # JSON string of list[str]
+    questions: Optional[str] = Form(None), # JSON string of list[dict]
     microphone_status: bool = Form(...),
     camera_status: bool = Form(...),
     # internet_status: bool = Form(...),
@@ -307,44 +37,28 @@ async def create_ephemeral_session(
 
     **Optional Configuration:**
     - skills: JSON list of skills (e.g. ["React", "Python"])
-    - questions: JSON list of specific questions to ask
-    - passing_score: Passing score for the interview
-    - valid_until: Validity date string
-
-    **Recommended Flow:**
-
-    **Flow 1 (Recommended - Separate Check):**
-    1. Call /check-compatibility to test devices
-    2. If compatible, call this endpoint to create session
-    3. Start interview
-
-    **Flow 2 (Combined - Optional):**
-    1. Test devices on frontend
-    2. Call this endpoint with compatibility params included
-    3. Session is created with compatibility data stored
-
+    - questions: JSON list of questions (e.g. [{"type": "short_answer", "question": "..."}])
+    - job_description: Text description of the job
+    
     This endpoint:
     1. Optionally validates compatibility (if params provided)
     2. Generates unique session_id (UUID)
-    3. Validates role
-    4. Extracts resume if provided
-    5. Creates system instructions
-    6. Generates ephemeral token from OpenAI
-    7. Returns token and WebRTC config to frontend
+    3. Creates system instructions based on role, JD, skills, and questions.
+    4. Generates ephemeral token from OpenAI
+    5. Returns token and WebRTC config to frontend
 
     Frontend then uses this token to connect DIRECTLY to OpenAI via WebRTC.
     """
     try:
         result = await realtime_service.create_ephemeral_session(
             mongodb_collection=mongodb_collection,
-            role_id=role_id,
-            company_name="Acelucid",  # Hardcoded company
-            interview_round="Technical Round",  # Hardcoded round
+            role_title=role_title,
             duration_minutes=duration_minutes,
             interviewer_id=interviewer_id,
-            user_id=None,  # POC: No authentication required
+            user_id=None,
             job_description=job_description,
             skills=skills,
+            questions=questions,
             # Required compatibility params
             microphone_status=microphone_status,
             camera_status=camera_status,
@@ -381,7 +95,12 @@ async def end_interview_session(
     
     mongodb_collection = Depends(get_realtime_interview_collection)
 ):
-    """End interview session and mark as completed."""
+    """
+    End interview session and mark as completed.
+    
+    This endpoint invalidates the session and prevents further updates.
+    It should be called when the user explicitly ends the interview or when the timer runs out.
+    """
     try:
         result = await realtime_service.end_interview_session(
             mongodb_collection=mongodb_collection,
@@ -420,6 +139,9 @@ async def update_conversation(
 ):
     """
     Update conversation transcript for the interview session.
+    
+    This endpoint is used to sync the client-side conversation state with the server.
+    It acts as a backup and allows for persistence of the interview dialog for later analysis.
 
     conversation_json format:
     [
@@ -466,13 +188,17 @@ async def evaluate_interview(
     mongodb_collection = Depends(get_realtime_interview_collection)
 ):
     """
-    Evaluate completed interview session.
+    Evaluate completed interview session using AI.
 
-    Provides comprehensive evaluation including:
-    - Question-by-question analysis with scores and feedback
-    - Overall performance breakdown
-    - Key strengths and focus areas
-    - Actionable recommendations
+    This triggers a comprehensive analysis of the interview transcript.
+    
+    Features:
+    - Overall performance scoring
+    - Detailed feedback on strengths and weaknesses
+    - Question-by-question analysis
+    - Actionable recommendations for the candidate
+    
+    Note: This process may take a few seconds as it involves LLM processing.
     """
     try:
         evaluation_data = await realtime_service.evaluate_interview(
@@ -784,7 +510,3 @@ async def get_token_usage_summary(
             Message=f"Failed to retrieve token usage: {str(e)}",
             Status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-
-
-

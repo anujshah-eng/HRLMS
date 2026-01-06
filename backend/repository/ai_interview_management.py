@@ -4,85 +4,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from connections.postgres_connection import DBResourceManager
 from models.ai_interview_model import (
-    AIInterviewRoles, AIInterviewers, AIInterviewQuestions
+    AIInterviewers
 )
 
 db_resource_manager = DBResourceManager(db_key=os.getenv("POSTGRES_DB"))
 
 class AIInterviewRolesRepository:
-    async def get_all_roles(self):
-        try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(select(AIInterviewRoles))
-                return result.scalars().all()
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-    async def get_role_by_id(self, role_id: int):
-        try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(
-                    select(AIInterviewRoles).filter(AIInterviewRoles.id == role_id)
-                )
-                return result.scalars().first()
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-    async def get_role_by_title(self, title: str):
-        try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(
-                    select(AIInterviewRoles).filter(AIInterviewRoles.title.ilike(title))
-                )
-                return result.scalars().first()
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-    async def create_role(self, title: str, description: str | None):
-        try:
-            async with db_resource_manager.async_session() as session:
-                role = AIInterviewRoles(title=title, description=description)
-                session.add(role)
-                await session.commit()
-                await session.refresh(role)
-                return role
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-    async def update_role(self, role_id: int, title: str, description: str | None):
-        try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(
-                    select(AIInterviewRoles).filter(AIInterviewRoles.id == role_id)
-                )
-                role = result.scalars().first()
-                if not role:
-                    return None
-                role.title = title
-                role.description = description
-                await session.commit()
-                await session.refresh(role)
-                return role
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-    async def delete_role(self, role_id: int):
-        try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(
-                    select(AIInterviewRoles).filter(AIInterviewRoles.id == role_id)
-                )
-                role = result.scalars().first()
-                if not role:
-                    return False
-                await session.delete(role)
-                await session.commit()
-                return True
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-
-
+    def __init__(self):
+        self.db = db_resource_manager
 
     async def get_all_interviewers(self):
         """Get all active AI interviewers"""
@@ -108,113 +37,6 @@ class AIInterviewRolesRepository:
                 return result.scalars().first()
         except SQLAlchemyError as e:
             raise Exception(f"Database error: {str(e)}")
-
-    async def create_question(self, question_text: str, topic: str | None, role_id: int | None):
-        """Create a new interview question"""
-        try:
-            async with db_resource_manager.async_session() as session:
-                question = AIInterviewQuestions(
-                    question_text=question_text,
-                    topic=topic,
-                    role_id=role_id
-                )
-                session.add(question)
-                await session.commit()
-                await session.refresh(question)
-                return question
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-    async def get_question_by_id(self, question_id: int):
-        """Get question by ID"""
-        try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(
-                    select(AIInterviewQuestions).filter(AIInterviewQuestions.id == question_id)
-                )
-                return result.scalars().first()
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-    async def get_all_questions(self, role_id: int | None = None, is_active: bool | None = True):
-        """Get all questions, optionally filtered by role_id"""
-        try:
-            async with db_resource_manager.async_session() as session:
-                query = select(AIInterviewQuestions)
-                
-                if is_active is not None:
-                    query = query.filter(AIInterviewQuestions.is_active == is_active)
-                
-                if role_id is not None:
-                    query = query.filter(AIInterviewQuestions.role_id == role_id)
-                
-                query = query.order_by(AIInterviewQuestions.created_at.desc())
-                result = await session.execute(query)
-                return result.scalars().all()
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-    async def update_question(self, question_id: int, question_text: str | None, topic: str | None, role_id: int | None, is_active: bool | None):
-        """Update a question"""
-        try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(
-                    select(AIInterviewQuestions).filter(AIInterviewQuestions.id == question_id)
-                )
-                question = result.scalars().first()
-                if not question:
-                    return None
-                
-                if question_text is not None:
-                    question.question_text = question_text
-                if topic is not None:
-                    question.topic = topic
-                if role_id is not None:
-                    question.role_id = role_id
-
-                if is_active is not None:
-                    question.is_active = is_active
-                
-                await session.commit()
-                await session.refresh(question)
-                return question
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-    async def delete_question(self, question_id: int):
-        """Soft delete a question by setting is_active to False"""
-        try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(
-                    select(AIInterviewQuestions).filter(AIInterviewQuestions.id == question_id)
-                )
-                question = result.scalars().first()
-                if not question:
-                    return False
-                
-                question.is_active = False
-                await session.commit()
-                return True
-        except SQLAlchemyError as e:
-            raise Exception(f"Database error: {str(e)}")
-
-
-    # async def get_languages(self):
-    #     async with db_resource_manager.async_session() as session:
-    #         q = await session.execute(
-    #             select(Languages).where(Languages.is_active == True).order_by(Languages.id)
-    #         )
-    #         return q.scalars().all()
-
-    # async def get_avatars(self, language_id=None):
-    #     async with db_resource_manager.async_session() as session:
-    #         stmt = select(Avatars).where(Avatars.is_active == True)
-
-    #         if language_id:
-    #             stmt = stmt.where(Avatars.language_id == language_id)
-
-    #         q = await session.execute(stmt)
-    #         return q.scalars().all()
 
 class RealtimeInterviewMongoRepository:
     """Repository for MongoDB operations for realtime interview sessions"""

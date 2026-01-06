@@ -37,47 +37,34 @@ class AIInterviewAgent:
     async def generate_questions(
         self,
         role: str,
-        interview_round: str,
-        difficulty: str,
-        num_questions: int = 5,
-        company_name: str | None = None,
-        resume_text: str | None = None,
-        job_description: str | None = None
+        duration: int,
+        job_description: str,
+        questions_list: List[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Generate interview questions based on role, round, and context
-
-        NOTE: This method is OPTIONAL and used only if you want to pre-generate
-        questions before the interview. For duration-based interviews where AI
-        asks questions dynamically, you DON'T need to call this method.
-
+        Generate or refine interview questions based on role, duration, and optional pre-defined questions.
+        
         Args:
-            role: Job role (e.g., "Software Engineer")
-            interview_round: Type of round (e.g., "Technical Interview")
-            difficulty: Difficulty level ("Easy", "Medium", "Hard")
-
-            company_name: Target company name (optional)
-            resume_text: Candidate's resume content (optional)
-            job_description: Job description text (optional)
-
+            role: Job role
+            duration: Interview duration in minutes
+            job_description: Job description text
+            questions_list: Optional list of pre-defined questions to include/prioritize
+            
         Returns:
-            List of question dictionaries with expected answers
+            List of question dictionaries
         """
         try:
             # Build context strings
-            company_context = f" at {company_name}" if company_name else ""
-            resume_context = f"Candidate's Resume:\n{resume_text}\n" if resume_text else ""
-            job_description_context = f"Job Description:\n{job_description}\n" if job_description else ""
+            questions_context = ""
+            if questions_list:
+                questions_context = "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions_list)])
 
             # Format prompt
             prompt_text = QUESTION_GENERATOR_PROMPT.format(
-                difficulty=difficulty,
-                interview_round=interview_round,
                 role=role,
-                company_context=company_context,
-                num_questions=num_questions,
-                resume_context=resume_context,
-                job_description_context=job_description_context
+                duration=f"{duration} minutes",
+                job_description_context=job_description,
+                questions_context=questions_context
             )
 
             # Generate questions
@@ -100,7 +87,7 @@ class AIInterviewAgent:
                 question.setdefault('order', idx + 1)
                 question.setdefault('topic', 'General')
 
-            logger.info(f"Generated {len(questions)} questions for {role} - {interview_round}")
+            logger.info(f"Generated {len(questions)} questions for {role}")
             return questions
 
         except json.JSONDecodeError as e:

@@ -16,6 +16,7 @@ from fastapi import status, UploadFile
 from custom_utilities.custom_exception import CustomException
 from repository.ai_interview_management import AIInterviewRolesRepository, RealtimeInterviewMongoRepository
 from agents.ai_interview.interview_agent import AIInterviewAgent
+from agents.ai_interview.system_prompts.interview_prompts import HR_SCREENING_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -38,39 +39,30 @@ class RealtimeInterviewService:
         self.aws_region = os.getenv("AWS_REGION_NAME")
         self.aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
         self.aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-
-        # System prompts directory - located in agents/ai_interview/system_prompts
-        # Go up to project root: services/ai_interview_management -> services -> root
         self.prompts_dir = Path(__file__).parent.parent.parent / "agents" / "ai_interview" / "system_prompts"
 
 
     async def create_ephemeral_session(
         self,
         mongodb_collection,
-        role_id: int,
-        company_name: str,
-        interview_round: str,
+        role_title: str,
         duration_minutes: int,
         interviewer_id: int,
-        user_id: str,
+        user_id: str | None,
         job_description: Optional[str] = None,
         skills: Optional[str] = None,
-        # Required compatibility test results
+        questions: Optional[str] = None,
         microphone_status: bool = True,
         camera_status: bool = True,
-        # internet_status: bool = True,
-        # internet_speed_mbps: Optional[float] = None
     ) -> dict:
         """
         Create an ephemeral session token for OpenAI Realtime API.
-
+        
         This method:
         1. Generates unique session_id (UUID)
-        2. Validates role and company
-        3. Extracts resume if provided
-        4. Creates system instructions
-        5. Generates ephemeral token from OpenAI
-        6. Returns token and WebRTC config to frontend
+        2. Creates system instructions using HR_SCREENING_SYSTEM_PROMPT
+        3. Generates ephemeral token from OpenAI
+        4. Returns token and WebRTC config to frontend
         """
         # Validate compatibility - ALL must be true
         if not (microphone_status and camera_status):
@@ -79,8 +71,6 @@ class RealtimeInterviewService:
                 compatibility_issues.append("Microphone not working")
             if not camera_status:
                 compatibility_issues.append("Camera not working")
-            # if not internet_status:
-            #     compatibility_issues.append("Internet not connected")
 
             raise CustomException(
                 f"Compatibility check failed: {', '.join(compatibility_issues)}.",
@@ -127,132 +117,70 @@ class RealtimeInterviewService:
             interviewer = MockInterviewer(mock_data)
 
 
-        # Get interview round (with fallback to mock data)
-        try:
-            interview_round_obj = await self.repo.get_interview_round_by_name(interview_round)
-            if not interview_round_obj:
-                # Fallback to mock interview round
-                logger.warning(f"Interview round not found in database, using mock data for: {interview_round}")
-                class MockInterviewRound:
-                    def __init__(self, name):
-                        self.name = name
-                        self.id = 1
-                interview_round_obj = MockInterviewRound(interview_round)
-        except AttributeError as e:
-            # Repository doesn't have this method - use mock data
-            logger.warning(f"Repository method not available, using mock interview round: {e}")
-            class MockInterviewRound:
-                def __init__(self, name):
-                    self.name = name
-                    self.id = 1
-            interview_round_obj = MockInterviewRound(interview_round)
-        except Exception as e:
-            # Any other database error - use mock data
-            logger.warning(f"Database error for interview round, using mock data: {e}")
-            class MockInterviewRound:
-                def __init__(self, name):
-                    self.name = name
-                    self.id = 1
-            interview_round_obj = MockInterviewRound(interview_round)
-
-        # Extract resume if provided
-        resume_context = None
-
-        # --- Role & Question Management ---
+        # --- Input Processing ---
+        
+        # 1. Parse Skills (JSON Array of strings)
         parsed_skills = []
         if skills:
             try:
                 parsed_skills = json.loads(skills)
+                if not isinstance(parsed_skills, list):
+                     logger.warning("Skills input is not a list, converting to list")
+                     parsed_skills = [str(parsed_skills)]
             except Exception as e:
                 logger.error(f"Failed to parse skills JSON: {e}")
+                # Try to handle as comma-separated string if JSON fails
+                parsed_skills = [s.strip() for s in skills.split(',')] if ',' in skills else [skills]
 
-
-
-        # Find Role by ID
-        role_obj = await self.repo.get_role_by_id(role_id)
-        if not role_obj:
-             raise CustomException("Role not found", status_code=status.HTTP_404_NOT_FOUND)
+        interview_role = role_title
         
-        interview_role = role_obj.title
-        # Use role description if job description not provided
-        if not job_description and role_obj.description:
-            job_description = role_obj.description
-
+        # 2. Parse Questions (JSON Array of dicts)
         final_questions_list = []
-
-        # Fetch questions from DB for the role
-        logger.info(f"Attempting to fetch questions for role_id: {role_id} (type: {type(role_id)})")
-        db_questions = await self.repo.get_all_questions(role_id=role_id)
+        parsed_questions = []
+        questions_context_str = ""
         
-        if db_questions:
-            # Use questions from DB
-            logger.info(f"Using {len(db_questions)} questions from database for role {role_id}")
-            # Convert to list of dicts for consistency
-            for q in db_questions:
-                final_questions_list.append({
-                    "question_text": q.question_text,
-                    "topic": q.topic,
-                    "id": q.id
-                })
-        else:
-            # Check if there are ANY questions (including inactive) for debugging
-            all_questions = await self.repo.get_all_questions(role_id=role_id, is_active=None)
-            if all_questions:
-                logger.warning(f"Found {len(all_questions)} INACTIVE questions for role {role_id}, but 0 active ones. Using inactive/all questions as fallback.")
-                for q in all_questions:
-                    final_questions_list.append({
-                        "question_text": q.question_text,
-                        "topic": q.topic,
-                        "id": q.id
-                    })
-            else:
-                logger.warning(f"No questions found in database for role_id {role_id} (active or inactive). Falling back to LLM generation.")
-                # Generate questions via LLM
-                logger.info("Generating questions via LLM...")
-                try:
-                    # Enhance Job Description with Skills for better context
-                    enhanced_jd = job_description or ""
-                    if parsed_skills:
-                        enhanced_jd += f"\nRequired Skills: {', '.join(parsed_skills)}"
-                    
-                    generated = await self.agent.generate_questions(
-                        role=interview_role,
-                        interview_round=interview_round_obj.name,
-                        difficulty="Medium", 
-                        num_questions=5, # approx fit for typical duration
-                        company_name=company_name,
-                        resume_text=resume_context,
-                        job_description=enhanced_jd
-                    )
-                    final_questions_list = generated
-                    
-                    # Questions used for this session only, not saving to DB
-                    
-                except Exception as e:
-                    logger.error(f"Failed to generate questions: {e}")
-                    # Fallback: empty list (will use standard adaptive flow)
-
-        # Format mandatory questions as JSON for system prompt
-        mandatory_questions_text = ""
+        if questions:
+            try:
+                parsed_questions = json.loads(questions)
+                if isinstance(parsed_questions, list):
+                    for q in parsed_questions:
+                        if isinstance(q, dict) and "question" in q:
+                            # Support { "type": "...", "question": "..." } format
+                            final_questions_list.append({
+                                "question_text": q["question"],
+                                "type": q.get("type", "general"),
+                                "question_id": str(uuid.uuid4())
+                            })
+                        elif isinstance(q, str):
+                            # Support simple list of strings
+                            final_questions_list.append({
+                                "question_text": q,
+                                "type": "general",
+                                "question_id": str(uuid.uuid4())
+                            })
+            except Exception as e:
+                logger.error(f"Failed to parse questions JSON: {e}")
+        
+        # Format questions as numbered list text for the prompt
         if final_questions_list:
-            import json
-            questions_data = []
-            for q in final_questions_list:
-                 q_text = q.get("question_text") or q.get("question")
-                 if q_text:
-                     questions_data.append(q_text)
-            
-            mandatory_questions_text = f"MANDATORY_QUESTIONS_JSON_DATA:\n{json.dumps(questions_data, indent=2)}"
+            q_texts = []
+            for i, q in enumerate(final_questions_list):
+                 q_type = f"[{q['type']}] " if q.get('type') != 'general' else ""
+                 q_texts.append(f"{i+1}. {q_type}{q['question_text']}")
+            questions_context_str = "\n".join(q_texts)
+
+
+        # Enhance Job Description with Skills
+        final_job_description = job_description or "Standard core role requirements."
+        if parsed_skills:
+            final_job_description += f"\n\nRequired Skills:\n{', '.join(parsed_skills)}"
 
         # Create system instructions
         system_instructions = self._create_system_instructions(
             role=interview_role,
-            company=company_name,
-            interview_round=interview_round_obj.name,
             duration=duration_minutes,
-            resume_context=resume_context,
-            job_description=job_description,
-            mandatory_questions=mandatory_questions_text
+            job_description=final_job_description,
+            mandatory_questions=questions_context_str
         )
 
         # Create ephemeral token from OpenAI with interviewer's voice
@@ -279,10 +207,8 @@ class RealtimeInterviewService:
             "_id": session_id,
             "session_id": session_id,
             "user_id": user_id,
-            "role_id": role_id, # Store role_id
+            "role_title": interview_role, # Store role_title instead of ID
             "interview_role": interview_role,
-            "company_name": company_name,
-            "interview_round": interview_round,
             "duration": duration_minutes,
             "duration_minutes": duration_minutes,
             "interviewer_id": interviewer.id,
@@ -291,26 +217,23 @@ class RealtimeInterviewService:
             "status": "initialized",
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
-            "resume_context": resume_context,
             "job_description": job_description,
             "conversation": [],
             "compatibility_test": {
                 "microphone_status": microphone_status,
                 "camera_status": camera_status,
-                # "internet_status": internet_status,
-                # "internet_speed_mbps": internet_speed_mbps,
                 "is_compatible": is_compatible,
                 "tested_at": tested_at
             },
             "token_usage": {
                 "system_instructions_tokens": system_instruction_tokens,
-                "realtime_api_tokens": 0,  # Will be updated during/after interview
-                "evaluation_tokens": 0,  # Will be updated after evaluation
+                "realtime_api_tokens": 0,
+                "evaluation_tokens": 0,
                 "total_tokens": system_instruction_tokens,
-                "estimated_cost_usd": 0.0  # Will be calculated after interview
+                "estimated_cost_usd": 0.0
             },
             "skills": parsed_skills,
-            "questions": final_questions_list, # Store questions being used
+            "questions": final_questions_list,
         }
 
         if mongodb_collection is not None:
@@ -323,11 +246,9 @@ class RealtimeInterviewService:
             "session_id": session_id,
             "ephemeral_token": ephemeral_token,
             "openai_api_url": "https://api.openai.com/v1/realtime",
-            # "model": "gpt-4o-realtime-preview-2024-12-17",
             "model": "gpt-4o-mini-realtime-preview-2024-12-17",
             "voice": interviewer.voice_id,
             "expires_at": expires_at,
-            "questions": final_questions_list, # Return questions to frontend
             "interviewer": {
                 "id": interviewer.id,
                 "name": interviewer.name,
@@ -355,8 +276,6 @@ class RealtimeInterviewService:
             },
             "interview_context": {
                 "role": interview_role,
-                "company": company_name,
-                "round": interview_round,
                 "duration": duration_minutes,
                 "type": "conversational"
             }
@@ -531,84 +450,35 @@ class RealtimeInterviewService:
             )
 
     def _get_round_specific_flow(self, interview_round: str, role: str, company: str = "") -> str:
-        """Get interview flow and questions specific to the interview round from markdown files"""
-
-        round_lower = interview_round.lower()
-
-        # Determine which prompt file to load based on interview round
-        if "warm" in round_lower or "warmup" in round_lower or "warm up" in round_lower:
-            prompt_file = "round_warmup.md"
-            prompt_content = self._load_prompt_from_file(prompt_file)
-            logger.info(f"Loading WARM-UP round prompt for interview_round: {interview_round}")
-        elif "technical" in round_lower or "tech" in round_lower:
-            prompt_file = "round_technical.md"
-            prompt_content = self._load_prompt_from_file(prompt_file)
-            logger.info(f"Loading TECHNICAL round prompt for interview_round: {interview_round}")
-        elif "managerial" in round_lower or "manager" in round_lower:
-            prompt_file = "round_managerial.md"
-            prompt_content = self._load_prompt_from_file(prompt_file)
-            logger.info(f"Loading MANAGERIAL round prompt for interview_round: {interview_round}")
-        elif "hr" in round_lower or "human" in round_lower:
-            prompt_file = "round_hr.md"
-            prompt_content = self._load_prompt_from_file(prompt_file)
-            logger.info(f"Loading HR round prompt for interview_round: {interview_round}")
-        else:
-            # Default/General round
-            prompt_file = "round_general.md"
-            prompt_content = self._load_prompt_from_file(prompt_file)
-            logger.warning(f"No specific round match for '{interview_round}', using general round")
-
-        # Replace placeholders with actual values
-        prompt_content = prompt_content.replace("{role}", role)
-        prompt_content = prompt_content.replace("{company}", company or '')
-
-        return prompt_content
+        """
+        Get interview flow.
+        Now simplified to always use the main instructions which define the HR Screening flow.
+        """
+        logger.info(f"Using unified HR Screening flow for round: {interview_round}")
+        return ""
 
     def _create_system_instructions(
         self,
         role: str,
-        company: str,
-        interview_round: str,
         duration: int,
-        resume_context: Optional[str] = None,
         job_description: Optional[str] = None,
         mandatory_questions: Optional[str] = None
     ) -> str:
-        """Create system instructions for the AI interviewer by loading from markdown file"""
+        """Create system instructions using HR_SCREENING_SYSTEM_PROMPT"""
 
-        # Build context section
-        context_parts = []
-        if resume_context:
-            context_parts.append(f"Candidate's Resume:\n{resume_context}")
-        if job_description:
-            context_parts.append(f"Job Description:\n{job_description}")
-        if mandatory_questions:
-            context_parts.append(mandatory_questions)
-        
-        context_section = "\n\n".join(context_parts) if context_parts else "No additional context provided."
+        # Format questions context
+        questions_context = mandatory_questions if mandatory_questions else "No specific pre-defined questions."
 
-        # Load main instructions template from file
-        main_instructions = self._load_prompt_from_file("main_instructions.md")
-
-        # Get round-specific flow (passing company for HR round)
-        round_specific_flow = self._get_round_specific_flow(interview_round, role, company)
-
-        # Replace all placeholders in the template
-        instructions = main_instructions.replace("{interview_round}", interview_round)
-        instructions = instructions.replace("{role}", role)
-        # Handle company placeholder - add "at [company]" only if company is provided
-        company_text = f" at {company}" if company else ""
-        instructions = instructions.replace("{company}", company_text)
-        instructions = instructions.replace("{duration}", str(duration))
-        instructions = instructions.replace("{interview_round_upper}", interview_round.upper())
-        instructions = instructions.replace("{round_specific_flow}", round_specific_flow)
-        instructions = instructions.replace("{resume_context}", resume_context or "")
-        instructions = instructions.replace("{job_description}", job_description or "")
-        instructions = instructions.replace("{context_section}", context_section)
+        # Format the system prompt
+        instructions = HR_SCREENING_SYSTEM_PROMPT.format(
+            role=role,
+            duration=f"{duration} minutes",
+            job_description_context=job_description or "No specific job description provided.",
+            questions_context=questions_context
+        )
 
         # Log the interview configuration for debugging
-        logger.info(f"System instructions created - Round: {interview_round}, Role: {role}, Company: {company or 'None'}, Duration: {duration} mins")
-        logger.debug(f"Round-specific flow preview: {round_specific_flow[:200]}...")
+        logger.info(f"System instructions created from HR_SCREENING_SYSTEM_PROMPT - Role: {role}, Duration: {duration} mins")
 
         return instructions
 

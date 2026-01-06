@@ -1,29 +1,12 @@
 from pydantic import BaseModel, Field
 
-class AIInterviewRoleCreateDTO(BaseModel):
-    title: str = Field(..., max_length=255)
-    description: str | None = Field(None, max_length=1000)
-
-class AIInterviewRoleUpdateDTO(BaseModel):
-    title: str = Field(..., max_length=255)
-    description: str | None = Field(None, max_length=1000)
-
-class QuestionCreateDTO(BaseModel):
-    question_text: str = Field(..., max_length=2000)
-    topic: str | None = Field(None, max_length=100)
-    role_id: int | None = None
-
-class QuestionUpdateDTO(BaseModel):
-    question_text: str | None = Field(None, max_length=2000)
-    topic: str | None = Field(None, max_length=100)
-    role_id: int | None = None
-    is_active: bool | None = None
-
 # Real-time Interview Session DTOs
 class CreateInterviewSessionDTO(BaseModel):
     """Step 1: Create interview session with basic setup"""
-    role_id: int = Field(..., description="Selected role ID")
+    role_title: str = Field(..., description="Selected role title")
     interview_round_id: int = Field(..., description="Selected interview round ID")
+    skills: list[str] | None = Field(None, description="List of skills")
+    questions: list[dict] | None = Field(None, description="List of questions")
 
 class UpdateSessionContextDTO(BaseModel):
     """Step 2: Add context (resume, company, job description)"""

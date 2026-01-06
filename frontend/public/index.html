@@ -233,6 +233,8 @@
         font-size: 1.25rem;
         transition: all 0.2s ease;
         color: white;
+        padding: 0;
+        line-height: 1;
     }
 
     .btn-mute {
@@ -430,7 +432,8 @@
     }
 
     input,
-    select {
+    select,
+    textarea {
         width: 100%;
         padding: 0.75rem 1rem;
         border: 1px solid var(--border);
@@ -449,7 +452,8 @@
     }
 
     input:focus,
-    select:focus {
+    select:focus,
+    textarea:focus {
         border-color: var(--primary);
         background: white;
         box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
@@ -814,6 +818,22 @@
                 </select>
             </div>
 
+            <!-- New Fields for Full API Support -->
+            <div class="input-group">
+                <label>Skills (comma separated)</label>
+                <textarea id="skills" rows="3" placeholder="e.g. React, Python, AWS"></textarea>
+            </div>
+
+            <div class="input-group">
+                <label>Job Description</label>
+                <textarea id="jobDescription" rows="3" placeholder="Paste JD here..."></textarea>
+            </div>
+
+            <div class="input-group">
+                <label>Questions (one per line)</label>
+                <textarea id="questions" rows="3" placeholder="Enter specific questions..."></textarea>
+            </div>
+
             <div style="margin-top:2rem;">
                 <button class="btn-primary" id="saveConfigBtn" style="width:100%">
                     Save & Close
@@ -875,6 +895,7 @@
                         style="background:#4b5563;">
                         🛠
                     </button>
+                    <button class="control-btn btn-mute" id="camBtn" title="Toggle Camera">📷</button>
                     <button class="control-btn btn-mute" id="muteBtn" title="Mute Mic">🎤</button>
 
                     <!-- Start Button (Visible initially) -->
@@ -916,7 +937,18 @@
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
+    <!-- Permission Help Overlay -->
+    <div id="permissionOverlay"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:200; align-items:center; justify-content:center; flex-direction:column; text-align:center; color:white;">
+        <div style="font-size:3rem; margin-bottom:1rem;">📷 🎤</div>
+        <h2 style="margin-bottom:0.5rem;">Camera & Microphone Access Needed</h2>
+        <p style="color:#d1d5db; margin-bottom:2rem; max-width:400px;">Please click "Allow" in your browser popup to
+            enable your camera and microphone for the interview.</p>
+        <button class="btn-primary" onclick="app.checkDevices()">Try Again</button>
+    </div>
+
     <script>
+        // ... (existing script start)
         // Configuration
         const FASTAPI_BASE_URL = 'http://localhost:8001';
         const NODEJS_BASE_URL = 'http://localhost:3000';
@@ -943,6 +975,9 @@
                 this.liveStopBtn = document.getElementById('liveStopBtn');
                 this.viewResultsBtn = document.getElementById('viewResultsBtn');
                 this.muteBtn = document.getElementById('muteBtn');
+                this.camBtn = document.getElementById('camBtn');
+
+                this.isCameraOff = false;
 
                 // Sidebar Elements
                 this.configSidebar = document.getElementById('configSidebar');
@@ -988,6 +1023,29 @@
                 // Device check in sidebar
                 this.checkDevicesBtn.addEventListener('click', () => this.checkDevices());
                 if (this.checkDevicesBtnMain) this.checkDevicesBtnMain.addEventListener('click', () => this.checkDevices());
+
+                this.camBtn.addEventListener('click', () => this.toggleCamera());
+            }
+
+            toggleCamera() {
+                if (this.localStream) {
+                    const videoTrack = this.localStream.getVideoTracks()[0];
+                    if (videoTrack) {
+                        this.isCameraOff = !this.isCameraOff;
+                        videoTrack.enabled = !this.isCameraOff;
+                        this.camBtn.textContent = this.isCameraOff ? '🚫' : '📷';
+                        this.camBtn.classList.toggle('active', this.isCameraOff);
+
+                        // Toggle placeholder visibility
+                        if (this.isCameraOff) {
+                            this.cameraPlaceholder.style.display = 'flex';
+                            this.localVideo.style.opacity = '0';
+                        } else {
+                            this.cameraPlaceholder.style.display = 'none';
+                            this.localVideo.style.opacity = '1';
+                        }
+                    }
+                }
             }
 
             toggleSidebar(open) {
@@ -1001,39 +1059,32 @@
             }
 
             async loadRoles() {
-                try {
-                    const response = await fetch(`${FASTAPI_BASE_URL}/aiInterviewManagement/getRoles`);
-                    const result = await response.json();
+                // Endpoint removed from backend, using static data
+                const roles = [
+                    { id: "1", title: "Software Trainee" },
+                    { id: "2", title: "Software Engineer" },
+                    { id: "3", title: "Senior Software Engineer" },
+                    { id: "4", title: "AI/ML Engineer" },
+                    { id: "5", title: "Product Manager" }
+                ];
 
-                    if (result.Success && result.Data) {
-                        this.roleSelect.innerHTML = result.Data.map(role =>
-                            `<option value="${role.id}">${role.title}</option>`
-                        ).join('');
+                this.roleSelect.innerHTML = roles.map(role =>
+                    `<option value="${role.id}">${role.title}</option>`
+                ).join('');
 
-                        // Select default if available (e.g. Software Trainee/Engineer)
-                        if (result.Data.length > 0) {
-                            this.roleSelect.value = result.Data[0].id;
-                        }
-                    }
-                } catch (error) {
-                    console.error('Failed to load roles:', error);
-                    this.roleSelect.innerHTML = '<option value="1">Software Trainee (Default)</option>';
-                }
+                // Select default
+                this.roleSelect.value = "1";
             }
 
             async loadInterviewers() {
-                try {
-                    const response = await fetch(`${FASTAPI_BASE_URL}/aiInterviewManagement/interviewers`);
-                    const result = await response.json();
-
-                    if (result.Success && result.Data) {
-                        this.interviewers = result.Data;
-                        this.populateInterviewerDropdown();
-                    }
-                } catch (error) {
-                    console.error('Failed to load interviewers:', error);
-                    this.interviewerSelect.innerHTML = '<option value="">Failed to load interviewers</option>';
-                }
+                // Endpoint removed from backend, using static data
+                this.interviewers = [
+                    { id: "1", name: "Priya Sharma", gender: "Female", accent: "Indian English" },
+                    { id: "2", name: "Sarah Johnson", gender: "Female", accent: "US English" },
+                    { id: "3", name: "Arjun Patel", gender: "Male", accent: "Indian English" },
+                    { id: "4", name: "Michael Chen", gender: "Male", accent: "US English" }
+                ];
+                this.populateInterviewerDropdown();
             }
 
             populateInterviewerDropdown() {
@@ -1081,8 +1132,16 @@
 
                     this.checkDevicesBtn.innerHTML = '<span>✅</span> Devices Ready';
                     this.checkDevicesBtn.style.background = '#4caf50';
+                    if (this.checkDevicesBtnMain) {
+                        this.checkDevicesBtnMain.innerHTML = '<span>✅</span>';
+                        this.checkDevicesBtnMain.style.background = '#4caf50';
+                    }
 
                     this.showToast('✅ Devices Working Properly', 'success');
+
+                    // Hide Permission Overlay if visible
+                    const permOverlay = document.getElementById('permissionOverlay');
+                    if (permOverlay) permOverlay.style.display = 'none';
 
                 } catch (error) {
                     console.error('Device check failed:', error);
@@ -1090,6 +1149,17 @@
                     this.deviceStatusText.textContent = '❌ Access denied or device not found';
                     this.deviceStatusText.className = 'device-status-text status-err';
                     this.showError('Camera/Microphone access is required. ' + error.message);
+
+                    if (this.checkDevicesBtnMain) {
+                        this.checkDevicesBtnMain.innerHTML = '<span>⚠️</span>';
+                        this.checkDevicesBtnMain.style.background = '#ef4444';
+                    }
+
+                    // Show permission overlay if likely a permission issue
+                    const permOverlay = document.getElementById('permissionOverlay');
+                    if (permOverlay && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')) {
+                        permOverlay.style.display = 'flex';
+                    }
                 }
             }
 
@@ -1133,11 +1203,33 @@
 
                     // Create FormData for FastAPI multipart/form-data endpoint
                     const formData = new FormData();
-                    formData.append('role_id', roleId);
+                    formData.append('role_title', roleName);
                     formData.append('duration_minutes', this.durationMinutes);
                     formData.append('interviewer_id', interviewerId);
                     formData.append('microphone_status', true);
                     formData.append('camera_status', true);
+
+                    // Optional params from sidebar inputs
+                    const jobDescription = document.getElementById('jobDescription').value.trim();
+                    const skills = document.getElementById('skills').value.trim();
+                    const questionsText = document.getElementById('questions').value.trim();
+
+                    if (jobDescription) formData.append('job_description', jobDescription);
+
+                    if (skills) {
+                        // Send as JSON array string: "['React', 'Node']" or just comma separated string depending on backend expectation. 
+                        // Backend expects JSON string of list[str] OR comma-separated. The python code handles both but let's try to be clean.
+                        // Simple comma split
+                        const skillsList = skills.split(',').map(s => s.trim()).filter(s => s.length > 0);
+                        formData.append('skills', JSON.stringify(skillsList));
+                    }
+
+                    if (questionsText) {
+                        // Backend expects JSON string of list[dict] or list[str]. 
+                        // Let's assume user types one question per line for simplicity and we convert to list of strings
+                        const questionsList = questionsText.split('\n').map(q => q.trim()).filter(q => q.length > 0);
+                        formData.append('questions', JSON.stringify(questionsList));
+                    }
 
 
 
@@ -1585,6 +1677,10 @@ At the end, thank them and let them know they'll hear back soon.`;
                 this.muteBtn.classList.remove('active');
                 this.muteBtn.textContent = '🎤';
 
+                this.isCameraOff = false;
+                this.camBtn.classList.remove('active');
+                this.camBtn.textContent = '📷';
+
                 // Revert Buttons
                 this.liveStopBtn.classList.add('hidden');
                 this.startBtn.classList.remove('hidden');
@@ -1607,8 +1703,10 @@ At the end, thank them and let them know they'll hear back soon.`;
                 if (connected) {
                     // Update live UI indicators if needed
                     this.checkDevicesBtn.disabled = true;
+                    if (this.checkDevicesBtnMain) this.checkDevicesBtnMain.disabled = true;
                 } else {
                     this.checkDevicesBtn.disabled = false;
+                    if (this.checkDevicesBtnMain) this.checkDevicesBtnMain.disabled = false;
                 }
             }
 

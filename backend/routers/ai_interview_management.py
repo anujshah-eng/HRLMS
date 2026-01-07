@@ -267,81 +267,7 @@ async def get_interviewers():
         )
 
 
-@router.get("/interview-history", response_model=ResponseDto)
-async def get_interview_history(
-    search: Optional[str] = None,
-    round: Optional[str] = None,
-    page: int = 1,
-    page_size: int = 10,
-    
-    mongodb_collection = Depends(get_realtime_interview_collection)
-):
-    """
-    Get paginated interview history for the current user.
 
-    Query Parameters:
-    - search: Search by role title or interviewer name (optional)
-    - round_filter: Filter by interview round (e.g., "Technical", "Behavioral", "All Rounds")
-    - page: Page number (default: 1)
-    - page_size: Items per page (default: 10, max: 50)
-
-    Returns:
-    - interviews: List of interview history items
-    - total_count: Total number of interviews
-    - page: Current page number
-    - page_size: Items per page
-    - has_more: Whether there are more pages
-
-    Each interview item includes:
-    - session_id: Unique session identifier
-    - role_title: Job role (e.g., "Software Engineer")
-    - company_name: Target company name
-    - interviewer_name: Interviewer's name
-    - interviewer_initials: Two-letter initials (e.g., "SJ" for Sarah Johnson)
-    - interview_round: Round type (e.g., "Technical")
-    - interview_date: When the interview was conducted
-    - duration_minutes: Interview duration
-    - overall_score: Score out of 100 (if evaluated)
-    - status: "completed" or "evaluated"
-    """
-    try:
-        # Validate page_size
-        if page_size > 50:
-            page_size = 50
-
-        # POC: No authentication required - using test user ID
-        user_id = "test_user_123"  # TODO: Replace with actual auth when implementing
-
-        history_data = await realtime_service.get_interview_history(
-            mongodb_collection=mongodb_collection,
-            user_id=str(user_id),
-            search=search,
-            round_filter=round,
-            page=page,
-            page_size=page_size
-        )
-
-        return ResponseDto(
-            Data=history_data,
-            Success=True,
-            Message="Interview history fetched successfully",
-            Status=status.HTTP_200_OK
-        )
-
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=f"Failed to fetch interview history: {str(e)}",
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 
 @router.get("/interview-details/{session_id}", response_model=ResponseDto)
@@ -371,13 +297,9 @@ async def get_interview_details(
     Use this endpoint to display detailed interview report after completion.
     """
     try:
-        # POC: No authentication required - using test user ID
-        user_id = "test_user_123"  # TODO: Replace with actual auth when implementing
-
         interview_details = await realtime_service.get_interview_details_by_session_id(
             mongodb_collection=mongodb_collection,
-            session_id=session_id,
-            user_id=str(user_id)
+            session_id=session_id
         )
 
         return ResponseDto(
@@ -403,6 +325,49 @@ async def get_interview_details(
         )
 
 
+@router.get("/interview/{session_id}/evaluation", response_model=ResponseDto)
+async def get_interview_evaluation(
+    session_id: str,
+    mongodb_collection = Depends(get_realtime_interview_collection)
+):
+    """
+    Get evaluation object by session ID.
+    
+    Path Parameters:
+    - session_id: Unique session identifier
+    
+    Returns:
+    - Evaluation object containing score, feedback, breakdown etc.
+    """
+    try:
+        evaluation = await realtime_service.get_evaluation_by_session_id(
+            mongodb_collection=mongodb_collection,
+            session_id=session_id
+        )
+
+        return ResponseDto(
+            Data=evaluation,
+            Success=True,
+            Message="Evaluation fetched successfully",
+            Status=status.HTTP_200_OK
+        )
+
+    except CustomException as e:
+        return ResponseDto(
+            Data=None,
+            Success=False,
+            Message=str(e),
+            Status=e.status_code
+        )
+    except Exception as e:
+        return ResponseDto(
+            Data=None,
+            Success=False,
+            Message=f"Failed to fetch evaluation: {str(e)}",
+            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @router.delete("/interview/{session_id}", response_model=ResponseDto)
 async def delete_interview_by_session_id(
     session_id: str,
@@ -423,19 +388,61 @@ async def delete_interview_by_session_id(
     - Success message with session_id
     """
     try:
-        # POC: No authentication required - using test user ID
-        user_id = "test_user_123"  # TODO: Replace with actual auth when implementing
-
         result = await realtime_service.delete_interview_by_session_id(
             mongodb_collection=mongodb_collection,
-            session_id=session_id,
-            user_id=str(user_id)
+            session_id=session_id
         )
 
         return ResponseDto(
             Data=result,
             Success=True,
             Message="Interview deleted successfully",
+            Status=status.HTTP_200_OK
+        )
+
+    except CustomException as e:
+        return ResponseDto(
+            Data=None,
+            Success=False,
+            Message=str(e),
+            Status=e.status_code
+        )
+    except Exception as e:
+        return ResponseDto(
+            Data=None,
+            Success=False,
+            Message=f"Failed to delete interview: {str(e)}",
+            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@router.delete("/interview/{session_id}/hard", response_model=ResponseDto)
+async def hard_delete_interview(
+    session_id: str,
+    mongodb_collection = Depends(get_realtime_interview_collection)
+):
+    """
+    Hard delete an interview session by session ID.
+    
+    Path Parameters:
+    - session_id: Unique session identifier
+    
+    This endpoint PERMANENTLY removes the interview session from the database.
+    This action cannot be undone.
+    
+    Returns:
+    - Success message
+    """
+    try:
+        result = await realtime_service.hard_delete_interview_session(
+            mongodb_collection=mongodb_collection,
+            session_id=session_id
+        )
+
+        return ResponseDto(
+            Data=result,
+            Success=True,
+            Message="Interview permanently deleted successfully",
             Status=status.HTTP_200_OK
         )
 
@@ -480,13 +487,9 @@ async def get_token_usage_summary(
     - Token usage breakdown and cost information
     """
     try:
-        # POC: No authentication required - using test user ID
-        user_id = "test_user_123"  # TODO: Replace with actual auth when implementing
-
         token_summary = await realtime_service.get_token_usage_summary(
             mongodb_collection=mongodb_collection,
-            session_id=session_id,
-            user_id=str(user_id)
+            session_id=session_id
         )
 
         return ResponseDto(

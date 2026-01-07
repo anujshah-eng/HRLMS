@@ -210,6 +210,8 @@ class RealtimeInterviewService:
             "user_id": user_id,
             "role_title": interview_role, # Store role_title instead of ID
             "interview_role": interview_role,
+            "company_name": "Acelucid Technologies Pvt. Ltd.",
+            "interview_round": "HR Screening",
             "duration": duration_minutes,
             "duration_minutes": duration_minutes,
             "interviewer_id": interviewer.id,
@@ -772,85 +774,12 @@ class RealtimeInterviewService:
             }
         ]
 
-    async def get_interview_history(
-        self,
-        mongodb_collection,
-        user_id: str,
-        search: Optional[str] = None,
-        round_filter: Optional[str] = None,
-        page: int = 1,
-        page_size: int = 10
-    ) -> dict:
-        """
-        Get paginated interview history for a user with search and filter options.
 
-        Args:
-            mongodb_collection: MongoDB collection for interviews
-            user_id: User ID to fetch history for
-            search: Search query for role or interviewer name
-            round_filter: Filter by interview round (e.g., "Technical", "Behavioral")
-            page: Page number (1-indexed)
-            page_size: Number of items per page
-
-        Returns:
-            Dictionary with interviews list, pagination info
-        """
-        # Calculate pagination
-        skip = (page - 1) * page_size
-
-        # Repository layer: Fetch sessions from database with filters
-        sessions, total_count = await self.mongo_repo.get_user_interview_history(
-            mongodb_collection=mongodb_collection,
-            user_id=user_id,
-            search=search,
-            round_filter=round_filter,
-            skip=skip,
-            limit=page_size
-        )
-
-        # Business logic: Calculate pagination metadata
-        has_more = total_count > (page * page_size)
-
-        # Business logic: Format response data
-        interviews = []
-        for session in sessions:
-            # Get interviewer initials
-            interviewer_name = session.get("interviewer_name", "Unknown")
-            initials = "".join([word[0].upper() for word in interviewer_name.split()[:2]])
-
-            # Get overall score from evaluation.overall_evaluation.total_score
-            evaluation = session.get("evaluation", {})
-            overall_evaluation = evaluation.get("overall_evaluation", {})
-            total_score = overall_evaluation.get("total_score")
-
-            interview_item = {
-                "session_id": session.get("session_id") or str(session.get("_id")),
-                "role_title": session.get("interview_role", "Unknown Role"),
-                "company_name": session.get("company_name"),
-                "interviewer_name": interviewer_name,
-                "interviewer_initials": initials,
-                "interview_round": session.get("interview_round", "General"),
-                "interview_date": session.get("created_at"),
-                "duration_minutes": session.get("duration", 30),
-                "overall_score": total_score,
-                "status": session.get("status", "completed")
-            }
-
-            interviews.append(interview_item)
-
-        return {
-            "interviews": interviews,
-            "total_count": total_count,
-            "page": page,
-            "page_size": page_size,
-            "has_more": has_more
-        }
 
     async def get_interview_details_by_session_id(
         self,
         mongodb_collection,
-        session_id: str,
-        user_id: str
+        session_id: str
     ) -> dict:
         """
         Get complete interview details by session ID.
@@ -858,14 +787,13 @@ class RealtimeInterviewService:
         Args:
             mongodb_collection: MongoDB collection for interviews
             session_id: Session ID to fetch details for
-            user_id: User ID to verify ownership
 
         Returns:
             Complete interview details including evaluation
         """
-        # Repository layer: Fetch session with user ownership verification
-        session = await self.mongo_repo.get_session_by_id_and_user(
-            mongodb_collection, session_id, user_id
+        # Repository layer: Fetch session (no user verification for POC)
+        session = await self.mongo_repo.get_session_by_id(
+            mongodb_collection, session_id
         )
 
         if not session:
@@ -895,25 +823,37 @@ class RealtimeInterviewService:
             "status": session.get("status"),
             "created_at": session.get("created_at"),
             "ended_at": session.get("ended_at"),
-            "evaluated_at": evaluation.get("evaluated_at"),
-            "conversation": session.get("conversation", []),
-            "evaluation": {
-                "total_score": overall_evaluation.get("total_score"),
-                "feedback_label": overall_evaluation.get("feedback_label"),
-                "key_strengths": overall_evaluation.get("key_strengths", []),
-                "focus_areas": overall_evaluation.get("focus_areas", []),
-                "performance_breakdown": overall_evaluation.get("performance_breakdown", {}),
-                "questions": questions
-            } if evaluation else None
+            "evaluated_at": evaluation.get("evaluated_at")
         }
 
         return interview_details
 
+    async def get_evaluation_by_session_id(
+        self,
+        mongodb_collection,
+        session_id: str
+    ) -> dict:
+        """
+        Get only the evaluation object by session ID.
+        
+        Args:
+            mongodb_collection: MongoDB collection for interviews
+            session_id: Session ID to fetch evaluation for
+            
+        Returns:
+            Evaluation object
+        """
+        session = await self.mongo_repo.get_session_by_id(mongodb_collection, session_id)
+        
+        if not session:
+            raise CustomException("Session not found", status_code=status.HTTP_404_NOT_FOUND)
+            
+        return session.get("evaluation")
+
     async def delete_interview_by_session_id(
         self,
         mongodb_collection,
-        session_id: str,
-        user_id: str
+        session_id: str
     ) -> dict:
         """
         Soft delete an interview by session ID.
@@ -921,17 +861,16 @@ class RealtimeInterviewService:
         Args:
             mongodb_collection: MongoDB collection for interviews
             session_id: Session ID to delete
-            user_id: User ID to verify ownership
 
         Returns:
             Success message
 
         Raises:
-            CustomException: If session not found or user doesn't have access
+            CustomException: If session not found
         """
-        # Repository layer: Perform soft delete operation
-        result = await self.mongo_repo.soft_delete_interview_session(
-            mongodb_collection, session_id, user_id
+        # Repository layer: Perform soft delete operation (no user check)
+        result = await self.mongo_repo.soft_delete_session_by_id(
+            mongodb_collection, session_id
         )
 
         # Business logic: Verify deletion was successful
@@ -941,16 +880,46 @@ class RealtimeInterviewService:
                 status_code=status.HTTP_404_NOT_FOUND
             )
 
+    async def hard_delete_interview_session(
+        self,
+        mongodb_collection,
+        session_id: str
+    ) -> dict:
+        """
+        Hard delete an interview session by session ID.
+        This permanently removes the record from the database.
+
+        Args:
+            mongodb_collection: MongoDB collection for interviews
+            session_id: Session ID to delete
+
+        Returns:
+            Success message
+
+        Raises:
+            CustomException: If session not found
+        """
+        # Repository layer: Perform hard delete operation
+        result = await self.mongo_repo.hard_delete_session_by_id(
+            mongodb_collection, session_id
+        )
+
+        # Business logic: Verify deletion was successful
+        if result.deleted_count == 0:
+            raise CustomException(
+                "Interview session not found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
         return {
             "session_id": session_id,
-            "message": "Interview deleted successfully"
+            "message": "Interview permanently deleted successfully"
         }
 
     async def get_token_usage_summary(
         self,
         mongodb_collection,
-        session_id: str,
-        user_id: str
+        session_id: str
     ) -> dict:
         """
         Get token usage and cost summary for a specific interview session.
@@ -958,17 +927,16 @@ class RealtimeInterviewService:
         Args:
             mongodb_collection: MongoDB collection for interviews
             session_id: Session ID to get token usage for
-            user_id: User ID to verify ownership
 
         Returns:
             Token usage breakdown and cost information
 
         Raises:
-            CustomException: If session not found or user doesn't have access
+            CustomException: If session not found
         """
-        # Repository layer: Fetch session with user ownership verification
-        session = await self.mongo_repo.get_session_by_id_and_user(
-            mongodb_collection, session_id, user_id
+        # Repository layer: Fetch session (no user verification)
+        session = await self.mongo_repo.get_session_by_id(
+            mongodb_collection, session_id
         )
 
         if not session:

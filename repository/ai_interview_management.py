@@ -188,73 +188,7 @@ class RealtimeInterviewMongoRepository:
             ]
         })
 
-    async def get_user_interview_history(
-        self,
-        mongodb_collection,
-        user_id: str,
-        search: str = None,
-        round_filter: str = None,
-        skip: int = 0,
-        limit: int = 10
-    ):
-        """
-        Get paginated interview history for a user.
 
-        Args:
-            mongodb_collection: MongoDB collection
-            user_id: User ID to fetch history for
-            search: Search query for role or interviewer name
-            round_filter: Filter by interview round
-            skip: Number of records to skip
-            limit: Number of records to return
-
-        Returns:
-            Tuple of (sessions list, total count)
-        """
-        # Build base query - exclude deleted interviews
-        base_conditions = {
-            "user_id": user_id,
-            "status": "evaluated",
-            "$or": [
-                {"is_deleted": {"$exists": False}},
-                {"is_deleted": False}
-            ]
-        }
-
-        # Start with base conditions
-        query = base_conditions.copy()
-
-        # Build additional conditions
-        additional_conditions = []
-
-        # Add search filter
-        if search:
-            additional_conditions.append({
-                "$or": [
-                    {"interview_role": {"$regex": search, "$options": "i"}},
-                    {"interviewer_name": {"$regex": search, "$options": "i"}}
-                ]
-            })
-
-        # Add round filter (exact match)
-        if round_filter and round_filter.lower() != "all rounds":
-            additional_conditions.append({"interview_round": round_filter})
-
-        # Combine conditions properly
-        if additional_conditions:
-            is_deleted_condition = query.pop("$or")
-            query["$and"] = [
-                {"$or": is_deleted_condition}
-            ] + additional_conditions
-
-        # Get total count
-        total_count = await mongodb_collection.count_documents(query)
-
-        # Fetch sessions
-        cursor = mongodb_collection.find(query).sort("created_at", -1).skip(skip).limit(limit)
-        sessions = await cursor.to_list(length=limit)
-
-        return sessions, total_count
 
     async def soft_delete_interview_session(
         self,
@@ -285,4 +219,46 @@ class RealtimeInterviewMongoRepository:
                 }
             }
         )
+        return result
+
+    async def soft_delete_session_by_id(
+        self,
+        mongodb_collection,
+        session_id: str
+    ):
+        """
+        Soft delete an interview session by setting is_deleted flag (without user check).
+
+        Args:
+            mongodb_collection: MongoDB collection
+            session_id: Session ID to delete
+
+        Returns:
+            Update result from MongoDB
+        """
+        result = await mongodb_collection.update_one(
+            {"_id": session_id},
+            {
+                "$set": {
+                    "is_deleted": True,
+                    "deleted_at": datetime.now(timezone.utc)
+                }
+            }
+        )
+    async def hard_delete_session_by_id(
+        self,
+        mongodb_collection,
+        session_id: str
+    ):
+        """
+        Hard delete an interview session from MongoDB.
+
+        Args:
+            mongodb_collection: MongoDB collection
+            session_id: Session ID to delete
+
+        Returns:
+            Delete result from MongoDB
+        """
+        result = await mongodb_collection.delete_one({"_id": session_id})
         return result

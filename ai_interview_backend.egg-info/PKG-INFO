@@ -1,0 +1,93 @@
+Metadata-Version: 2.4
+Name: ai-interview-backend
+Version: 1.0.0
+Summary: AI Interview Management Backend API
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi[all]==0.103.2
+Requires-Dist: pydantic==2.11.5
+Requires-Dist: python-dotenv==1.1.0
+Requires-Dist: toml==0.10.2
+Requires-Dist: boto3==1.34.89
+Requires-Dist: sib-api-v3-sdk==7.6.0
+Requires-Dist: uvicorn[standard]==0.23.2
+Requires-Dist: python-multipart==0.0.9
+Requires-Dist: bcrypt==4.1.3
+Requires-Dist: email-validator==2.1.1
+Requires-Dist: itsdangerous==2.2.0
+Requires-Dist: authlib==1.3.1
+Requires-Dist: PyJWT==2.8.0
+Requires-Dist: sqlalchemy>=2.0.38
+Requires-Dist: databases==0.9.0
+Requires-Dist: psycopg2-binary>=2.9.10
+Requires-Dist: asyncpg==0.30.0
+Requires-Dist: pymysql==1.0.2
+Requires-Dist: pymongo==4.7.2
+Requires-Dist: pyfcm==2.0.4
+Requires-Dist: firebase_admin==6.5.0
+Requires-Dist: nanoid==2.0.0
+Requires-Dist: tavily-python>=0.7.9
+Requires-Dist: langgraph>=0.5.2
+Requires-Dist: langchain-community>=0.3.21
+Requires-Dist: langchain-openai>=0.2.1
+Requires-Dist: langsmith>=0.3.45
+Requires-Dist: alembic>=1.16.5
+Requires-Dist: motor>=3.5.3
+Requires-Dist: aioboto3>=13.1.1
+Requires-Dist: aiofiles>=24.1.0
+Requires-Dist: httpx>=0.28.1
+Requires-Dist: aiomysql>=0.3.2
+
+# Acelucid MindMentor
+
+
+### Installation:
+    uv sync
+
+------------------------
+
+### Running the Application:
+#### Run with Uvicorn (for FastAPI or ASGI apps)
+    uvicorn main:app --reload --port 8000
+
+#### Code Linting:
+    pylint **/*.py
+
+## Environment Configuration
+#### Environment configuration files are located in the envs/ directory:
+    envs/.env.dev → Development
+    envs/.env.staging → Staging
+    envs/.env.prod → Production
+
+#### Set the correct environment before running database setup or starting the application.
+
+## Database Setup - Commands
+## Windows (Command Prompt)
+#### Development
+set ENV=dev&& python -m scripts.seed  
+
+#### Staging
+set ENV=staging&& python -m scripts.seed  
+
+#### Production
+set ENV=prod&& python -m scripts.seed  
+
+## Linux / macOS (Bash)
+#### Development
+ENV=dev python -m scripts.seed  
+
+#### Staging
+ENV=staging python -m scripts.seed  
+
+#### Production
+ENV=prod python -m scripts.seed  
+
+## PowerShell
+#### Development
+$env:ENV="dev"; python -m scripts.seed  
+
+#### Staging
+$env:ENV="staging"; python -m scripts.seed  
+
+#### Production
+$env:ENV="prod"; python -m scripts.seed  

@@ -7,8 +7,9 @@ class InterviewSessionResponseDTO(BaseModel):
     """Response for interview session"""
     id: int
     session_id: str
-    user_id: UUID | str  # Accept both UUID and string
     role_title: str
+    front_end_session_id: int | None = None
+    candidate_id: int | None = None
     company_id: int | None
     interview_round_id: int
     avatar_id: int
@@ -32,10 +33,6 @@ class InterviewSessionResponseDTO(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    @field_serializer('user_id')
-    def serialize_user_id(self, user_id: UUID | str, _info):
-        """Convert UUID to string for JSON serialization"""
-        return str(user_id)
 
     class Config:
         from_attributes = True
@@ -74,6 +71,8 @@ class QuestionFeedbackDTO(BaseModel):
 class InterviewReportDTO(BaseModel):
     """Complete interview performance report"""
     session_id: str
+    front_end_session_id: int | None = None
+    candidate_id: int | None = None
     role: str
     interview_round: str
     duration_minutes: int
@@ -98,6 +97,8 @@ class InterviewerDTO(BaseModel):
 class InterviewHistoryItemDTO(BaseModel):
     """Single interview history item"""
     session_id: str
+    front_end_session_id: int | None = None
+    candidate_id: int | None = None
     role_title: str
     company_name: str | None
     interviewer_name: str

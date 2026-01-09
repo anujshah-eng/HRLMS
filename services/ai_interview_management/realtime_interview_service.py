@@ -48,7 +48,8 @@ class RealtimeInterviewService:
         role_title: str,
         duration_minutes: int,
         interviewer_id: int,
-        user_id: str | None,
+        front_end_session_id: int,
+        candidate_id: int,
         job_description: Optional[str] = None,
         skills: Optional[str] = None,
         questions: Optional[str] = None,
@@ -207,7 +208,9 @@ class RealtimeInterviewService:
         session_data = {
             "_id": session_id,
             "session_id": session_id,
-            "user_id": user_id,
+            "front_end_session_id": front_end_session_id,
+            "candidate_id": candidate_id,
+            # "user_id": user_id,  <-- REMOVED
             "role_title": interview_role, # Store role_title instead of ID
             "interview_role": interview_role,
             "company_name": "Acelucid Technologies Pvt. Ltd.",
@@ -814,6 +817,8 @@ class RealtimeInterviewService:
         # Business logic: Build formatted response
         interview_details = {
             "session_id": session.get("session_id"),
+            "front_end_session_id": session.get("front_end_session_id"),
+            "candidate_id": session.get("candidate_id"),
             "role_title": session.get("interview_role"),
             "company_name": session.get("company_name"),
             "interview_round": session.get("interview_round"),
@@ -831,19 +836,25 @@ class RealtimeInterviewService:
     async def get_evaluation_by_session_id(
         self,
         mongodb_collection,
-        session_id: str
+        front_end_session_id: int,
+        candidate_id: int
     ) -> dict:
         """
-        Get only the evaluation object by session ID.
+        Get only the evaluation object by front_end_session_id and candidate_id.
         
         Args:
             mongodb_collection: MongoDB collection for interviews
-            session_id: Session ID to fetch evaluation for
+            front_end_session_id: Front end session ID
+            candidate_id: Candidate ID
             
         Returns:
             Evaluation object
         """
-        session = await self.mongo_repo.get_session_by_id(mongodb_collection, session_id)
+        session = await self.mongo_repo.get_session_by_frontend_and_candidate(
+            mongodb_collection, 
+            front_end_session_id, 
+            candidate_id
+        )
         
         if not session:
             raise CustomException("Session not found", status_code=status.HTTP_404_NOT_FOUND)

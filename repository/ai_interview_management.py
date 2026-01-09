@@ -50,6 +50,13 @@ class RealtimeInterviewMongoRepository:
         """Get session by session_id"""
         return await mongodb_collection.find_one({"_id": session_id})
 
+    async def get_session_by_frontend_and_candidate(self, mongodb_collection, front_end_session_id: int, candidate_id: int):
+        """Get session by front_end_session_id and candidate_id"""
+        return await mongodb_collection.find_one({
+            "front_end_session_id": front_end_session_id,
+            "candidate_id": candidate_id
+        })
+
     async def update_session_status(self, mongodb_collection, session_id: str, status: str):
         """Update session status"""
         result = await mongodb_collection.update_one(

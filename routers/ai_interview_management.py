@@ -14,6 +14,8 @@ async def create_ephemeral_session(
     role_title: str = Form(...),
     duration_minutes: int = Form(..., ge=5, le=30),
     interviewer_id: int = Form(...),
+    front_end_session_id: int = Form(...),
+    candidate_id: int = Form(...),
     job_description: Optional[str] = Form(None),
     skills: Optional[str] = Form(None),  # JSON string of list[str]
     questions: Optional[str] = Form(None), # JSON string of list[dict]
@@ -55,7 +57,8 @@ async def create_ephemeral_session(
             role_title=role_title,
             duration_minutes=duration_minutes,
             interviewer_id=interviewer_id,
-            user_id=None,
+            front_end_session_id=front_end_session_id,
+            candidate_id=candidate_id,
             job_description=job_description,
             skills=skills,
             questions=questions,
@@ -325,16 +328,18 @@ async def get_interview_details(
         )
 
 
-@router.get("/interview/{session_id}/evaluation", response_model=ResponseDto)
+@router.get("/interview/evaluation", response_model=ResponseDto)
 async def get_interview_evaluation(
-    session_id: str,
+    front_end_session_id: int,
+    candidate_id: int,
     mongodb_collection = Depends(get_realtime_interview_collection)
 ):
     """
-    Get evaluation object by session ID.
+    Get evaluation object by front_end_session_id and candidate_id.
     
-    Path Parameters:
-    - session_id: Unique session identifier
+    Query Parameters:
+    - front_end_session_id: Frontend session ID
+    - candidate_id: Candidate ID
     
     Returns:
     - Evaluation object containing score, feedback, breakdown etc.
@@ -342,7 +347,8 @@ async def get_interview_evaluation(
     try:
         evaluation = await realtime_service.get_evaluation_by_session_id(
             mongodb_collection=mongodb_collection,
-            session_id=session_id
+            front_end_session_id=front_end_session_id,
+            candidate_id=candidate_id
         )
 
         return ResponseDto(

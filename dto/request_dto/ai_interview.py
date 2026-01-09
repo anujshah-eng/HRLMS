@@ -5,6 +5,8 @@ class CreateInterviewSessionDTO(BaseModel):
     """Step 1: Create interview session with basic setup"""
     role_title: str = Field(..., description="Selected role title")
     interview_round_id: int = Field(..., description="Selected interview round ID")
+    front_end_session_id: int = Field(..., description="Front end session ID")
+    candidate_id: int = Field(..., description="Candidate ID")
     skills: list[str] | None = Field(None, description="List of skills")
     questions: list[dict] | None = Field(None, description="List of questions")
 

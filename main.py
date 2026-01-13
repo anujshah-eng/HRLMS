@@ -35,6 +35,7 @@ async def lifespan(fastapi_app: FastAPI):
         await fastapi_app.state.mongo_manager.connect()
 
         fastapi_app.state.realtime_interview_collection = fastapi_app.state.mongo_manager.db["ai_interview_sessions"]
+        fastapi_app.state.ai_interviewers_collection = fastapi_app.state.mongo_manager.db["ai_interviewers"]
 
         print("Application initialization completed successfully!")
         fastapi_app.state.initialized = True

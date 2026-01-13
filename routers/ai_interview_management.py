@@ -3,7 +3,7 @@ from fastapi import APIRouter, status, Depends, Form, UploadFile, File
 from dto.response_dto.response_dto import ResponseDto
 from services.ai_interview_management.realtime_interview_service import RealtimeInterviewService
 from custom_utilities.custom_exception import CustomException
-from custom_utilities.dependencies import get_realtime_interview_collection
+from custom_utilities.dependencies import get_realtime_interview_collection, get_ai_interviewers_collection
 
 router = APIRouter()
 realtime_service = RealtimeInterviewService()
@@ -24,7 +24,8 @@ async def create_ephemeral_session(
     # internet_status: bool = Form(...),
     # internet_speed_mbps: Optional[float] = Form(None),
     
-    mongodb_collection = Depends(get_realtime_interview_collection)
+    mongodb_collection = Depends(get_realtime_interview_collection),
+    ai_interviewers_collection = Depends(get_ai_interviewers_collection)
 ):
     """
     Create an ephemeral session token for OpenAI Realtime API.
@@ -54,6 +55,7 @@ async def create_ephemeral_session(
     try:
         result = await realtime_service.create_ephemeral_session(
             mongodb_collection=mongodb_collection,
+            ai_interviewers_collection=ai_interviewers_collection,
             role_title=role_title,
             duration_minutes=duration_minutes,
             interviewer_id=interviewer_id,
@@ -234,7 +236,9 @@ async def evaluate_interview(
 
 
 @router.get("/interviewers", response_model=ResponseDto)
-async def get_interviewers():
+async def get_interviewers(
+    ai_interviewers_collection = Depends(get_ai_interviewers_collection)
+):
     """
     Get list of available interviewers with voice models.
 
@@ -253,7 +257,7 @@ async def get_interviewers():
     - Description
     """
     try:
-        interviewers = await realtime_service.get_interviewers()
+        interviewers = await realtime_service.get_interviewers(ai_interviewers_collection)
         return ResponseDto(
             Data=interviewers,
             Success=True,

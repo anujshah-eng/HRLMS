@@ -1,41 +1,40 @@
-import os
-from datetime import datetime, timezone
-from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
-from connections.mysql_connection import MySQLResourceManager as DBResourceManager
-from models.ai_interview_model import (
-    AIInterviewers
-)
-
-db_resource_manager = DBResourceManager()
+from models.ai_interviewer import AIInterviewer
 
 class AIInterviewRolesRepository:
-    def __init__(self):
-        self.db = db_resource_manager
+    def __init__(self, mongodb_collection=None):
+        self.collection = mongodb_collection
 
     async def get_all_interviewers(self):
-        """Get all active AI interviewers"""
+        """Get all active AI interviewers from MongoDB"""
         try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(
-                    select(AIInterviewers).filter(AIInterviewers.is_active == True)
-                )
-                return result.scalars().all()
-        except SQLAlchemyError as e:
+            if self.collection is None:
+                return []
+            
+            # Fetch active interviewers
+            cursor = self.collection.find({"is_active": True})
+            interviewers_data = await cursor.to_list(length=100)
+            
+            # Convert to Pydantic models
+            return [AIInterviewer(**data) for data in interviewers_data]
+        except Exception as e:
             raise Exception(f"Database error: {str(e)}")
 
     async def get_interviewer_by_id(self, interviewer_id: int):
-        """Get interviewer by ID"""
+        """Get interviewer by ID from MongoDB"""
         try:
-            async with db_resource_manager.async_session() as session:
-                result = await session.execute(
-                    select(AIInterviewers).filter(
-                        AIInterviewers.id == interviewer_id,
-                        AIInterviewers.is_active == True
-                    )
-                )
-                return result.scalars().first()
-        except SQLAlchemyError as e:
+            if self.collection is None:
+                return None
+
+            # Fetch specific interviewer by ID (handling integer ID)
+            result = await self.collection.find_one({
+                "id": interviewer_id,
+                "is_active": True
+            })
+            
+            if result:
+                return AIInterviewer(**result)
+            return None
+        except Exception as e:
             raise Exception(f"Database error: {str(e)}")
 
 class RealtimeInterviewMongoRepository:

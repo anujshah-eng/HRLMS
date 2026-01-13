@@ -24,7 +24,8 @@ class RealtimeInterviewService:
     """Service for managing realtime AI interviews using OpenAI Realtime API"""
 
     def __init__(self):
-        self.repo = AIInterviewRolesRepository()
+        # Repository initialized without collection
+        # Collection will be passed to methods
         self.mongo_repo = RealtimeInterviewMongoRepository()
         self.agent = AIInterviewAgent()
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -45,6 +46,7 @@ class RealtimeInterviewService:
     async def create_ephemeral_session(
         self,
         mongodb_collection,
+        ai_interviewers_collection,
         role_title: str,
         duration_minutes: int,
         interviewer_id: int,
@@ -83,8 +85,11 @@ class RealtimeInterviewService:
         session_id = f"interview_{uuid.uuid4().hex}"
 
         # Get interviewer details (with fallback to mock data)
+        # Get interviewer details (with fallback to mock data)
         try:
-            interviewer = await self.repo.get_interviewer_by_id(interviewer_id)
+            # Initialize repo with collection for this request
+            repo = AIInterviewRolesRepository(ai_interviewers_collection)
+            interviewer = await repo.get_interviewer_by_id(interviewer_id)
             if not interviewer:
                 raise CustomException("Interviewer not found", status_code=status.HTTP_404_NOT_FOUND)
         except Exception as e:
@@ -689,7 +694,7 @@ class RealtimeInterviewService:
 
         return evaluation_data
 
-    async def get_interviewers(self) -> list[dict]:
+    async def get_interviewers(self, ai_interviewers_collection) -> list[dict]:
         """
         Get list of available interviewers with voice models from database.
         Returns 2 female and 2 male interviewers with their video assets.
@@ -697,7 +702,8 @@ class RealtimeInterviewService:
         Available OpenAI voices: alloy, ash, ballad, coral, echo, sage, shimmer, verse
         """
         try:
-            interviewers_db = await self.repo.get_all_interviewers()
+            repo = AIInterviewRolesRepository(ai_interviewers_collection)
+            interviewers_db = await repo.get_all_interviewers()
 
             if interviewers_db and len(interviewers_db) > 0:
                 # Database has interviewers - use them

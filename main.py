@@ -7,7 +7,6 @@ from starlette.middleware.sessions import SessionMiddleware
 from config.env_loader import load_env  
 from config.env_validator import validate_required_env_vars
 from routers import ai_interview_management
-from connections.mysql_connection import MySQLResourceManager as DBResourceManager
 from connections.mongo_connection import MotorMongoDBResourceManager
 
 # Configure logging
@@ -29,7 +28,6 @@ async def lifespan(fastapi_app: FastAPI):
 
         validate_required_env_vars()
 
-        fastapi_app.state.db_manager = DBResourceManager()
 
         fastapi_app.state.mongo_manager = MotorMongoDBResourceManager()
         await fastapi_app.state.mongo_manager.connect()
@@ -39,16 +37,10 @@ async def lifespan(fastapi_app: FastAPI):
 
         print("Application initialization completed successfully!")
         fastapi_app.state.initialized = True
-    else:
-        fastapi_app.state.db_manager = DBResourceManager()
-        fastapi_app.state.mongo_manager = MotorMongoDBResourceManager()
-        fastapi_app.state.mongo_manager.connect()
 
     yield
 
     print("Shutting down application...")
-    if hasattr(fastapi_app.state, "db_manager"):
-        fastapi_app.state.db_manager.close()
     if hasattr(fastapi_app.state, "mongo_manager"):
         fastapi_app.state.mongo_manager.close()
     print("Application shutdown completed!")

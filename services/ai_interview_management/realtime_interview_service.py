@@ -405,9 +405,9 @@ class RealtimeInterviewService:
                         },
                         "turn_detection": {
                             "type": "server_vad",
-                            "threshold": 0.3,  # Lower threshold for better detection (was 0.5)
-                            "prefix_padding_ms": 1000,  # More context before speech (was 300)
-                            "silence_duration_ms": 3000  # Wait longer for pauses (was 500)
+                            "threshold": 0.5,  # Less sensitive to avoid false interruptions (was 0.3)
+                            "prefix_padding_ms": 300,  # Reduced overlap before speech (was 1000)
+                            "silence_duration_ms": 4000  # Wait 4 seconds as requested (was 5000)
                         },
                         "temperature": 0.8,
                         "max_response_output_tokens": 4096

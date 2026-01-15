@@ -212,6 +212,32 @@ class RealtimeInterviewEvaluationService:
 
             logger.info(f"Evaluation completed. Tokens used: {total_evaluation_tokens} (Input: {total_input_tokens}, Output: {total_output_tokens}), Cost: ${evaluation_cost}")
 
+            # === NEW: Interview Completeness Validation ===
+            duration_minutes = session_data.get("duration", 0)
+            minimum_questions_required = duration_minutes / 2
+            questions_asked = len(qa_pairs)
+            
+            # Determine if interview was complete and calculate adjusted score
+            interview_complete = questions_asked >= minimum_questions_required
+            
+            if interview_complete:
+                # Case 2: Full interview - use actual questions as denominator
+                adjusted_total_score = overall_evaluation.get("total_score", 0)
+                completeness_status = "Complete"
+                completeness_message = f"Interview completed successfully with {questions_asked} questions."
+            else:
+                # Case 1: Early termination - recalculate score with minimum as denominator
+                # Get sum of individual question scores
+                total_scored_points = sum(q.get("score", 0) for q in question_evaluations)
+                max_possible_points = minimum_questions_required * 10  # Each question max 10 points
+                
+                # Recalculate percentage based on minimum required
+                adjusted_total_score = (total_scored_points / max_possible_points) * 100 if max_possible_points > 0 else 0
+                completeness_status = "Incomplete"
+                completeness_message = f"Interview incomplete. Only {questions_asked}/{minimum_questions_required:.1f} minimum questions covered."
+                
+                logger.warning(f"Interview ended early: {questions_asked} questions vs {minimum_questions_required:.1f} minimum required. Adjusted score: {adjusted_total_score:.1f}%")
+
             # Build final evaluation response
             evaluation_result = {
                 "session_id": session_data.get("session_id"),
@@ -221,12 +247,15 @@ class RealtimeInterviewEvaluationService:
                     "company":session_data.get("company_name"),
                     "interview_round": interview_round,
                     "duration_minutes": session_data.get("duration", 0),
-                    "total_questions": len(qa_pairs)
+                    "total_questions": len(qa_pairs),
+                    "minimum_questions_required": minimum_questions_required,
+                    "completeness_status": completeness_status,
+                    "completeness_message": completeness_message
                 },
                 "questions": question_evaluations,
                 "overall_evaluation": {
-                    "total_score": overall_evaluation.get("total_score", 0),
-                    "result": ("pass" if passing_score is not None and overall_evaluation.get("total_score", 0) >= passing_score else "fail") if passing_score is not None else None,
+                    "total_score": round(adjusted_total_score, 2),
+                    "result": (("pass" if passing_score is not None and adjusted_total_score >= passing_score else "fail") if passing_score is not None else None),
                     "feedback_label": overall_evaluation.get("feedback_label", "Fair"),
                     "key_strengths": overall_evaluation.get("key_strengths", []),
                     "focus_areas": overall_evaluation.get("focus_areas", []),

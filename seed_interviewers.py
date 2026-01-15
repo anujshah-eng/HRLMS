@@ -3,7 +3,7 @@ import os
 from motor.motor_asyncio import AsyncIOMotorClient
 
 # Use the URI provided by the user
-MONGO_URI = "mongodb+srv://nagarjunts_db_user:@hrms.xr3lreu.mongodb.net/?appName=hrms"
+MONGO_URI = ""
 DB_NAME = "ai_interview"
 COLLECTION_NAME = "ai_interviewers"
 

@@ -43,27 +43,32 @@ class RealtimeInterviewService:
         self.prompts_dir = Path(__file__).parent.parent.parent / "agents" / "ai_interview" / "system_prompts"
 
 
-    async def _notify_external_backend(self, session_id: str, status: str, score: float):
+    async def _notify_external_backend(self, front_end_session_id: int, status: str, score: float):
         """
         Notify external backend about interview completion.
         This runs in the background to avoid blocking the user response.
         """
         url = os.getenv("EXTERNAL_STATUS_API_URL", "https://dev-backend.acelucid.com/api/ai/session/status")
+        
+        # Ensure score is integer as per validation rules (nullable|integer|min:0)
+        final_score = int(round(score)) if score is not None else 0
+        
         payload = {
-            "session_id": session_id,
-            "status": status,  # "PASS" or "FAIL"
-            "score": score     # e.g., 85.5
+            "session_id": front_end_session_id,  # Must be Integer (from frontend)
+            "status": status.lower(),            # "pass" or "fail" (lowercase required)
+            "score": final_score                 # Integer
         }
         
         try:
             # Short timeout (5s) so we don't hang if their server is slow
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload, timeout=5.0)
+                # Changed to PATCH as per API spec
+                response = await client.patch(url, json=payload, timeout=5.0)
                 
                 if response.status_code == 200:
-                    logger.info(f"✅ Notification sent for Session {session_id}: {payload}")
+                    logger.info(f"✅ Notification sent for Session {front_end_session_id}: {payload}")
                 else:
-                    logger.warning(f"⚠️ Notification failed for Session {session_id}: {response.status_code} - {response.text}")
+                    logger.warning(f"⚠️ Notification failed for Session {front_end_session_id}: {response.status_code} - {response.text}")
                     
         except Exception as e:
             # We catch ALL exceptions so the main evaluation never crashes
@@ -719,21 +724,20 @@ class RealtimeInterviewService:
         await self.mongo_repo.save_evaluation(mongodb_collection, session_id, evaluation_data)
 
         # === NEW: Notify External Backend (Fire-and-Forget) ===
-        # Extract result status (default to FAIL if missing)
-        result_status = evaluation_data.get("overall_evaluation", {}).get("result", "fail")
-        # Extract total score
-        total_score = evaluation_data.get("overall_evaluation", {}).get("total_score", 0.0)
-        
-        # Ensure status is uppercase "PASS" or "FAIL"
-        status_str = str(result_status).upper() if result_status else "FAIL"
-        
-        # Run in background
-        import asyncio
-        asyncio.create_task(self._notify_external_backend(
-            session_id=session_id,
-            status=status_str,
-            score=total_score
-        ))
+        front_end_id = session.get("front_end_session_id")
+        if front_end_id:
+            # Extract result status (default to FAIL if missing)
+            result_status = evaluation_data.get("overall_evaluation", {}).get("result", "fail")
+            # Extract total score
+            total_score = evaluation_data.get("overall_evaluation", {}).get("total_score", 0.0)
+            
+            # Run in background
+            import asyncio
+            asyncio.create_task(self._notify_external_backend(
+                front_end_session_id=front_end_id,
+                status=str(result_status),
+                score=total_score
+            ))
 
         return evaluation_data
 

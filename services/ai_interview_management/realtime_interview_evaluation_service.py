@@ -60,6 +60,10 @@ class RealtimeInterviewEvaluationService:
             Comprehensive evaluation with questions and overall performance
         """
         try:
+            # Fallback to stored passing score if not provided in request
+            if passing_score is None:
+                passing_score = session_data.get("passing_score")
+            
             # Extract role and company info
             # role_id = session_data.get("role_id")
             # company_id = session_data.get("company_id")

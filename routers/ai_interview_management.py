@@ -21,6 +21,7 @@ async def create_ephemeral_session(
     questions: Optional[str] = Form(None), # JSON string of list[dict]
     microphone_status: bool = Form(...),
     camera_status: bool = Form(...),
+    passing_score: Optional[int] = Form(None), # Capture passing score from frontend
     # internet_status: bool = Form(...),
     # internet_speed_mbps: Optional[float] = Form(None),
     
@@ -67,6 +68,7 @@ async def create_ephemeral_session(
             # Required compatibility params
             microphone_status=microphone_status,
             camera_status=camera_status,
+            passing_score=passing_score
             # internet_status=internet_status,
             # internet_speed_mbps=internet_speed_mbps
         )

@@ -88,6 +88,7 @@ class RealtimeInterviewService:
         questions: Optional[str] = None,
         microphone_status: bool = True,
         camera_status: bool = True,
+        passing_score: Optional[int] = None
     ) -> dict:
         """
         Create an ephemeral session token for OpenAI Realtime API.
@@ -276,6 +277,7 @@ class RealtimeInterviewService:
             },
             "skills": parsed_skills,
             "questions": final_questions_list,
+            "passing_score": passing_score, # Store in DB
         }
 
         if mongodb_collection is not None:

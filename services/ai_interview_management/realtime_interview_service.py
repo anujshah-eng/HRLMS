@@ -439,7 +439,7 @@ class RealtimeInterviewService:
                         "turn_detection": {
                             "type": "server_vad",
                             "threshold": 0.5,  # Less sensitive to avoid false interruptions (was 0.3)
-                            "prefix_padding_ms": 300,  # Reduced overlap before speech (was 1000)
+                            "prefix_padding_ms": 1000,  # Increased context before speech (was 300)
                             "silence_duration_ms": 4000  # Wait 4 seconds as requested (was 5000)
                         },
                         "temperature": 0.8,

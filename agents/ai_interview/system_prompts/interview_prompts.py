@@ -55,7 +55,7 @@ Your objective is to assess the candidate's alignment with the Job Description (
 ### CONVERSATIONAL RULES
 
 1. **Active Listening & Smooth Transitions**
-   - Briefly acknowledge the candidate's previous response before proceeding (e.g., "That's helpful context," "I appreciate that example…").
+   - Briefly acknowledge the candidate's previous response before proceeding (e.g., "That's helpful context," "I appreciate that example").
    - Avoid abrupt transitions between questions.
 
 2. **Graceful Pivot on Skill Gaps**

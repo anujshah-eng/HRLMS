@@ -438,9 +438,9 @@ class RealtimeInterviewService:
                         },
                         "turn_detection": {
                             "type": "server_vad",
-                            "threshold": 0.5,  # Less sensitive to avoid false interruptions (was 0.3)
-                            "prefix_padding_ms": 1000,  # Increased context before speech (was 300)
-                            "silence_duration_ms": 4000  # Wait 4 seconds as requested (was 5000)
+                            "threshold": 0.5,  # Lowered to 0.4 to prevent cutting off quiet speech (was 0.5)
+                            "prefix_padding_ms": 300,  # Reduced padding to prevent capturing tail of AI voice (was 1000)
+                            "silence_duration_ms": 4000  # 4-second rule as requested
                         },
                         "temperature": 0.8,
                         "max_response_output_tokens": 4096

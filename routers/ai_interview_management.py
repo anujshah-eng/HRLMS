@@ -16,6 +16,7 @@ async def create_ephemeral_session(
     interviewer_id: int = Form(...),
     front_end_session_id: int = Form(...),
     candidate_id: int = Form(...),
+    token: str = Form(...),  # Authentication token from frontend
     job_description: Optional[str] = Form(None),
     skills: Optional[str] = Form(None),  # JSON string of list[str]
     questions: Optional[str] = Form(None), # JSON string of list[dict]
@@ -62,6 +63,7 @@ async def create_ephemeral_session(
             interviewer_id=interviewer_id,
             front_end_session_id=front_end_session_id,
             candidate_id=candidate_id,
+            token=token,
             job_description=job_description,
             skills=skills,
             questions=questions,

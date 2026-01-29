@@ -43,7 +43,7 @@ class RealtimeInterviewService:
         self.prompts_dir = Path(__file__).parent.parent.parent / "agents" / "ai_interview" / "system_prompts"
 
 
-    async def _notify_external_backend(self, front_end_session_id: int, status: str, score: float):
+    async def _notify_external_backend(self, front_end_session_id: int, status: str, score: float, token: str):
         """
         Notify external backend about interview completion.
         This runs in the background to avoid blocking the user response.
@@ -56,7 +56,8 @@ class RealtimeInterviewService:
         payload = {
             "session_id": front_end_session_id,  # Must be Integer (from frontend)
             "status": status.lower(),            # "pass" or "fail" (lowercase required)
-            "score": final_score                 # Integer
+            "score": final_score,                # Integer
+            "token": token                       # Authentication token
         }
         
         try:
@@ -83,6 +84,7 @@ class RealtimeInterviewService:
         interviewer_id: int,
         front_end_session_id: int,
         candidate_id: int,
+        token: str,
         job_description: Optional[str] = None,
         skills: Optional[str] = None,
         questions: Optional[str] = None,
@@ -278,6 +280,7 @@ class RealtimeInterviewService:
             "skills": parsed_skills,
             "questions": final_questions_list,
             "passing_score": passing_score, # Store in DB
+            "token": token,  # Authentication token from frontend
         }
 
         if mongodb_collection is not None:
@@ -727,6 +730,7 @@ class RealtimeInterviewService:
 
         # === NEW: Notify External Backend (Fire-and-Forget) ===
         front_end_id = session.get("front_end_session_id")
+        session_token = session.get("token", "")  # Get token from session data
         if front_end_id:
             # Extract result status (default to FAIL if missing)
             result_status = evaluation_data.get("overall_evaluation", {}).get("result", "fail")
@@ -738,7 +742,8 @@ class RealtimeInterviewService:
             asyncio.create_task(self._notify_external_backend(
                 front_end_session_id=front_end_id,
                 status=str(result_status),
-                score=total_score
+                score=total_score,
+                token=session_token
             ))
 
         return evaluation_data

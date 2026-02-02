@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-# Real-time Interview Session DTOs
+
 class CreateInterviewSessionDTO(BaseModel):
     """Step 1: Create interview session with basic setup"""
     role_title: str = Field(..., description="Selected role title")

@@ -81,14 +81,4 @@ class AIInterviewRolesService:
         return True
 
 
-    # async def fetch_languages(self):
-    #     languages = await self.repo.get_languages()
-    #     return [lang for lang in languages]
-    
-    # async def fetch_avatars(self, language_id=None):
-    #     avatars = await self.repo.get_avatars(language_id)
-    #     return [avatar for avatar in avatars]
-
-    # async def fetch_avatars_by_language(self, language_id: int):
-    #     avatars = await self.repo.fetch_avatars_by_language(language_id)
-    #     return [avatar for avatar in avatars]
+   

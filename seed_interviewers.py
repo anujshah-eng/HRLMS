@@ -2,7 +2,7 @@ import asyncio
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# Use the URI provided by the user
+
 MONGO_URI = ""
 DB_NAME = "ai_interview"
 COLLECTION_NAME = "ai_interviewers"
@@ -55,7 +55,7 @@ async def seed_data():
     db = client[DB_NAME]
     collection = db[COLLECTION_NAME]
 
-    # Check connection
+    
     try:
         await db.command("ping")
         print(f"Connected to MongoDB: {DB_NAME}")
@@ -63,7 +63,7 @@ async def seed_data():
         print(f"Connection failed: {e}")
         return
 
-    # Check for existing data
+    
     count = await collection.count_documents({})
     print(f"Current document count in '{COLLECTION_NAME}': {count}")
 
@@ -73,7 +73,7 @@ async def seed_data():
         print(f"Successfully inserted {len(result.inserted_ids)} interviewers.")
     else:
         print("Collection already has data. Skipping seed.")
-        # Print existing IDs
+        
         async for doc in collection.find({}, {"id": 1, "name": 1}):
             print(f" - Found: {doc.get('name')} (ID: {doc.get('id')})")
 

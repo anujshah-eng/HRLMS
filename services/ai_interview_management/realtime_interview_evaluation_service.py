@@ -30,7 +30,7 @@ class RealtimeInterviewEvaluationService:
             encoding = tiktoken.encoding_for_model("gpt-4o-mini")
             return len(encoding.encode(text))
         except:
-            # Fallback: ~1 token per 4 characters
+            
             return len(text) // 4
 
     def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
@@ -60,28 +60,21 @@ class RealtimeInterviewEvaluationService:
             Comprehensive evaluation with questions and overall performance
         """
         try:
-            # Fallback to stored passing score if not provided in request
+            
             if passing_score is None:
                 passing_score = session_data.get("passing_score")
             
-            # Extract role and company info
-            # role_id = session_data.get("role_id")
-            # company_id = session_data.get("company_id")
+           
             interview_round = session_data.get("interview_round", "Technical Round")
 
-            # role = self.repo.get_role_by_id(role_id)
-            # company = self.repo.get_company_by_id(company_id)
+            
 
-            # if not role or not company:
-            #     raise ValueError("Invalid role or company")
-
-            # Extract Q&A pairs from conversation
             qa_pairs = self._extract_qa_pairs(conversation_transcript["conversation"])
 
-            # Handle case where interview was exited early with no valid answers
+            
             if not qa_pairs or len(qa_pairs) == 0:
                 logger.warning("No valid question-answer pairs found. Interview likely exited early.")
-                # Return zero score evaluation
+                
                 return {
                     "session_id": session_data.get("session_id"),
                     "evaluated_at": datetime.now(timezone.utc).isoformat(),
@@ -119,36 +112,36 @@ class RealtimeInterviewEvaluationService:
 
             logger.info(f"Evaluating {len(qa_pairs)} questions for session")
 
-            # Track token usage for evaluation
+            
             total_input_tokens = 0
             total_output_tokens = 0
 
-            # Evaluate each question
+           
             question_evaluations = []
             for idx, qa in enumerate(qa_pairs, 1):
                 try:
-                    # Estimate input tokens for this question evaluation
+                    
                     input_text = f"Question: {qa['question']}\nAnswer: {qa['answer']}\nRole: {session_data.get('interview_role')}"
                     question_input_tokens = self._estimate_tokens(input_text)
 
                     evaluation = await self.interview_agent.evaluate_answer(
                         question_text=qa["question"],
-                        expected_answer="",  # Realtime interviews don't have pre-defined expected answers
+                        expected_answer="",  
                         user_answer=qa["answer"],
                         role=session_data.get("interview_role"),
                         interview_round=interview_round,
-                        difficulty="Medium"  # Default difficulty for realtime interviews
+                        difficulty="Medium"  
                     )
 
-                    # Estimate output tokens (evaluation response)
+                    
                     output_text = str(evaluation)
                     question_output_tokens = self._estimate_tokens(output_text)
 
-                    # Accumulate tokens
+                    
                     total_input_tokens += question_input_tokens
                     total_output_tokens += question_output_tokens
 
-                    # Format question evaluation
+                    
                     question_eval = {
                         "question_number": idx,
                         "question": qa["question"],
@@ -171,7 +164,7 @@ class RealtimeInterviewEvaluationService:
 
                 except Exception as e:
                     logger.error(f"Error evaluating question {idx}: {str(e)}")
-                    # Add placeholder evaluation for failed questions
+                    
                     question_evaluations.append({
                         "question_number": idx,
                         "question": qa["question"],
@@ -189,8 +182,8 @@ class RealtimeInterviewEvaluationService:
                         }
                     })
 
-            # Generate overall evaluation
-            # Estimate input tokens for overall evaluation
+           
+            
             overall_input_text = f"Role: {session_data.get('interview_role')}\nQuestions: {len(qa_pairs)}\nEvaluations: {str(question_evaluations)[:500]}"
             overall_input_tokens = self._estimate_tokens(overall_input_text)
 
@@ -202,47 +195,46 @@ class RealtimeInterviewEvaluationService:
                 question_evaluations=question_evaluations
             )
 
-            # Estimate output tokens for overall evaluation
+            
             overall_output_text = str(overall_evaluation)
             overall_output_tokens = self._estimate_tokens(overall_output_text)
 
-            # Add overall evaluation tokens
+            
             total_input_tokens += overall_input_tokens
             total_output_tokens += overall_output_tokens
 
-            # Calculate total evaluation tokens and cost
+           
             total_evaluation_tokens = total_input_tokens + total_output_tokens
             evaluation_cost = self._calculate_cost(total_input_tokens, total_output_tokens)
 
             logger.info(f"Evaluation completed. Tokens used: {total_evaluation_tokens} (Input: {total_input_tokens}, Output: {total_output_tokens}), Cost: ${evaluation_cost}")
 
-            # === NEW: Interview Completeness Validation ===
+            
             duration_minutes = session_data.get("duration", 0)
             minimum_questions_required = duration_minutes / 2
             questions_asked = len(qa_pairs)
             
-            # Determine if interview was complete and calculate adjusted score
+            
             interview_complete = questions_asked >= minimum_questions_required
             
             if interview_complete:
-                # Case 2: Full interview - use actual questions as denominator
+                
                 adjusted_total_score = overall_evaluation.get("total_score", 0)
                 completeness_status = "Complete"
                 completeness_message = f"Interview completed successfully with {questions_asked} questions."
             else:
-                # Case 1: Early termination - recalculate score with minimum as denominator
-                # Get sum of individual question scores
-                total_scored_points = sum(q.get("score", 0) for q in question_evaluations)
-                max_possible_points = minimum_questions_required * 10  # Each question max 10 points
                 
-                # Recalculate percentage based on minimum required
+                total_scored_points = sum(q.get("score", 0) for q in question_evaluations)
+                max_possible_points = minimum_questions_required * 10  
+                
+                
                 adjusted_total_score = (total_scored_points / max_possible_points) * 100 if max_possible_points > 0 else 0
                 completeness_status = "Incomplete"
                 completeness_message = f"Interview incomplete. Only {questions_asked}/{minimum_questions_required:.1f} minimum questions covered."
                 
                 logger.warning(f"Interview ended early: {questions_asked} questions vs {minimum_questions_required:.1f} minimum required. Adjusted score: {adjusted_total_score:.1f}%")
 
-            # Build final evaluation response
+            
             evaluation_result = {
                 "session_id": session_data.get("session_id"),
                 "evaluated_at": datetime.now(timezone.utc).isoformat(),
@@ -274,7 +266,7 @@ class RealtimeInterviewEvaluationService:
                     "evaluation_input_tokens": total_input_tokens,
                     "evaluation_output_tokens": total_output_tokens,
                     "evaluation_total_tokens": total_evaluation_tokens,
-                    # "evaluation_cost_usd": evaluation_cost
+                    
                 }
             }
 
@@ -305,40 +297,40 @@ class RealtimeInterviewEvaluationService:
             if not content:
                 continue
 
-            # Assistant messages are questions
+            
             if role == "assistant":
-                # If we have a pending question without answer, save it
+                
                 if current_question and not current_question.get("answer"):
-                    # Save question without answer (might be interrupted)
+                    
                     current_question["answer"] = "[No answer provided]"
                     qa_pairs.append(current_question)
 
-                # Start new question
+                
                 current_question = {
                     "question": content,
                     "answer": None,
                     "question_timestamp": message.get("timestamp")
                 }
 
-            # User messages are answers
+            
             elif role == "user" and current_question:
                 current_question["answer"] = content
                 current_question["answer_timestamp"] = message.get("timestamp")
                 qa_pairs.append(current_question)
                 current_question = None
 
-        # Handle last question if unanswered
+        
         if current_question and not current_question.get("answer"):
             current_question["answer"] = "[Interview ended before answer]"
             qa_pairs.append(current_question)
 
-        # Filter out pairs without proper answers or placeholder answers
+        
         qa_pairs = [
             qa for qa in qa_pairs
             if qa.get("answer")
             and not qa["answer"].startswith("[")
             and qa["answer"].strip() != ""
-            and len(qa["answer"].strip()) > 3  # At least a few characters
+            and len(qa["answer"].strip()) > 3  
         ]
 
         return qa_pairs

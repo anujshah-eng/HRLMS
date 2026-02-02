@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 class AIInterviewer(BaseModel):
-    id: int  # Legacy integer ID from MySQL
+    id: int  
     name: str
     voice_id: str
     gender: str

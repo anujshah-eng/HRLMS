@@ -7,7 +7,7 @@ def load_env():
     if os.getenv('_ENV_INITIALIZED'):
         return
 
-    # Get project root and load .env from root
+   
     project_root = Path(__file__).parent.parent
     env_file_path = project_root / ".env"
     

@@ -24,18 +24,14 @@ class RealtimeInterviewService:
     """Service for managing realtime AI interviews using OpenAI Realtime API"""
 
     def __init__(self):
-        # Repository initialized without collection
-        # Collection will be passed to methods
+        
         self.mongo_repo = RealtimeInterviewMongoRepository()
         self.agent = AIInterviewAgent()
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
-        # self.transcription_model = os.getenv("TRANSCRIPTION_MODEL", "whisper-1")
-        # Transcription model configuration
-        # Options: "whisper-1" (standard, cost-effective)
-        # For better accuracy with accents/noise, consider upgrading in future
+        
         self.transcription_model = os.getenv("TRANSCRIPTION_MODEL", "whisper-1")
 
-        # S3 configuration
+        
         self.s3_bucket_name = os.getenv("S3_BUCKET_NAME")
         self.aws_region = os.getenv("AWS_REGION_NAME")
         self.aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
@@ -50,20 +46,20 @@ class RealtimeInterviewService:
         """
         url = os.getenv("EXTERNAL_STATUS_API_URL", "https://dev-backend.acelucid.com/api/ai/session/status")
         
-        # Ensure score is integer as per validation rules (nullable|integer|min:0)
+        
         final_score = int(round(score)) if score is not None else 0
         
         payload = {
-            "session_id": front_end_session_id,  # Must be Integer (from frontend)
-            "status": status.lower(),            # "pass" or "fail" (lowercase required)
-            "score": final_score,                # Integer
-            "token": token                       # Authentication token
+            "session_id": front_end_session_id,  
+            "status": status.lower(),            
+            "score": final_score,                
+            "token": token                       
         }
         
         try:
-            # Short timeout (5s) so we don't hang if their server is slow
+            
             async with httpx.AsyncClient() as client:
-                # Changed to PATCH as per API spec
+                
                 response = await client.patch(url, json=payload, timeout=5.0)
                 
                 if response.status_code == 200:
@@ -72,7 +68,7 @@ class RealtimeInterviewService:
                     logger.warning(f"⚠️ Notification failed for Session {front_end_session_id}: {response.status_code} - {response.text}")
                     
         except Exception as e:
-            # We catch ALL exceptions so the main evaluation never crashes
+            
             logger.error(f"❌ Error notifying external backend: {str(e)}")
 
     async def create_ephemeral_session(
@@ -101,7 +97,7 @@ class RealtimeInterviewService:
         3. Generates ephemeral token from OpenAI
         4. Returns token and WebRTC config to frontend
         """
-        # Validate compatibility - ALL must be true
+        
         if not (microphone_status and camera_status):
             compatibility_issues = []
             if not microphone_status:
@@ -115,20 +111,19 @@ class RealtimeInterviewService:
             )
 
 
-        # Generate unique session_id
+        
         session_id = f"interview_{uuid.uuid4().hex}"
 
-        # Get interviewer details (with fallback to mock data)
-        # Get interviewer details (with fallback to mock data)
+        
         try:
-            # Initialize repo with collection for this request
+            
             repo = AIInterviewRolesRepository(ai_interviewers_collection)
             interviewer = await repo.get_interviewer_by_id(interviewer_id)
             if not interviewer:
                 raise CustomException("Interviewer not found", status_code=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.warning(f"Database query for interviewer failed, using mock data: {e}")
-            # Fallback to mock interviewer data
+            
             mock_interviewers = {
                 "1": {"id": 1, "name": "Priya Sharma", "voice_id": "shimmer", "gender": "Female", "accent": "Indian English"},
                 "2": {"id": 2, "name": "Sarah Johnson", "voice_id": "coral", "gender": "Female", "accent": "US English"},
@@ -141,7 +136,7 @@ class RealtimeInterviewService:
                 logger.warning(f"Interviewer ID {interviewer_id} not found in mocks, defaulting to ID 1")
                 mock_data = mock_interviewers.get("1")
             
-            # Create a mock interviewer object with required attributes
+            
             class MockInterviewer:
                 def __init__(self, data):
                     self.id = data["id"]
@@ -158,9 +153,9 @@ class RealtimeInterviewService:
             interviewer = MockInterviewer(mock_data)
 
 
-        # --- Input Processing ---
         
-        # 1. Parse Skills (JSON Array of strings)
+        
+        
         parsed_skills = []
         if skills:
             try:
@@ -170,39 +165,52 @@ class RealtimeInterviewService:
                      parsed_skills = [str(parsed_skills)]
             except Exception as e:
                 logger.error(f"Failed to parse skills JSON: {e}")
-                # Try to handle as comma-separated string if JSON fails
+                
                 parsed_skills = [s.strip() for s in skills.split(',')] if ',' in skills else [skills]
 
         interview_role = role_title
         
-        # 2. Parse Questions (JSON Array of dicts)
+        
         final_questions_list = []
         parsed_questions = []
         questions_context_str = ""
         
         if questions:
+            parsed_questions = []
             try:
+                # Try parsing as JSON first
                 parsed_questions = json.loads(questions)
-                if isinstance(parsed_questions, list):
-                    for q in parsed_questions:
-                        if isinstance(q, dict) and "question" in q:
-                            # Support { "type": "...", "question": "..." } format
-                            final_questions_list.append({
-                                "question_text": q["question"],
-                                "type": q.get("type", "general"),
-                                "question_id": str(uuid.uuid4())
-                            })
-                        elif isinstance(q, str):
-                            # Support simple list of strings
-                            final_questions_list.append({
-                                "question_text": q,
-                                "type": "general",
-                                "question_id": str(uuid.uuid4())
-                            })
-            except Exception as e:
-                logger.error(f"Failed to parse questions JSON: {e}")
+            except Exception:
+                # Fallback: Treat as raw string
+                logger.debug("Failed to parse questions as JSON, treating as plain text")
+                parsed_questions = questions
+
+            if isinstance(parsed_questions, list):
+                # Handle List (JSON array)
+                for q in parsed_questions:
+                    if isinstance(q, dict) and "question" in q:
+                        final_questions_list.append({
+                            "question_text": q["question"],
+                            "type": q.get("type", "general"),
+                            "question_id": str(uuid.uuid4())
+                        })
+                    elif isinstance(q, str):
+                        final_questions_list.append({
+                            "question_text": q,
+                            "type": "general",
+                            "question_id": str(uuid.uuid4())
+                        })
+            elif isinstance(parsed_questions, str):
+                # Handle String (Split by newlines)
+                lines = [line.strip() for line in parsed_questions.split('\n') if line.strip()]
+                for line in lines:
+                    final_questions_list.append({
+                        "question_text": line,
+                        "type": "general",
+                        "question_id": str(uuid.uuid4())
+                    })
         
-        # Format questions as numbered list text for the prompt
+        
         if final_questions_list:
             q_texts = []
             for i, q in enumerate(final_questions_list):
@@ -211,12 +219,12 @@ class RealtimeInterviewService:
             questions_context_str = "\n".join(q_texts)
 
 
-        # Enhance Job Description with Skills
+        
         final_job_description = job_description or "Standard core role requirements."
         if parsed_skills:
             final_job_description += f"\n\nRequired Skills:\n{', '.join(parsed_skills)}"
 
-        # Create system instructions
+        
         system_instructions = self._create_system_instructions(
             role=interview_role,
             duration=duration_minutes,
@@ -224,33 +232,33 @@ class RealtimeInterviewService:
             mandatory_questions=questions_context_str
         )
 
-        # Create ephemeral token from OpenAI with interviewer's voice
+        
         ephemeral_token = await self._create_openai_session(
             system_instructions=system_instructions,
             voice=interviewer.voice_id
         )
 
-        # Prepare compatibility test data
+        
         is_compatible = microphone_status and camera_status
         tested_at = datetime.now(timezone.utc)
 
-        # Calculate system instruction tokens (approximate)
+        
         import tiktoken
         try:
             encoding = tiktoken.encoding_for_model("gpt-4o-mini")
             system_instruction_tokens = len(encoding.encode(system_instructions))
         except:
-            # Fallback approximation: ~1 token per 4 characters
+            
             system_instruction_tokens = len(system_instructions) // 4
 
-        # Store session info in MongoDB
+        
         session_data = {
             "_id": session_id,
             "session_id": session_id,
             "front_end_session_id": front_end_session_id,
             "candidate_id": candidate_id,
-            # "user_id": user_id,  <-- REMOVED
-            "role_title": interview_role, # Store role_title instead of ID
+            
+            "role_title": interview_role, 
             "interview_role": interview_role,
             "company_name": "Acelucid Technologies Pvt. Ltd.",
             "interview_round": "HR Screening",
@@ -279,14 +287,14 @@ class RealtimeInterviewService:
             },
             "skills": parsed_skills,
             "questions": final_questions_list,
-            "passing_score": passing_score, # Store in DB
-            "token": token,  # Authentication token from frontend
+            "passing_score": passing_score, 
+            "token": token,  
         }
 
         if mongodb_collection is not None:
             await self.mongo_repo.create_session(mongodb_collection, session_data)
 
-        # Calculate token expiration
+        
         expires_at = (datetime.now(timezone.utc) + timedelta(seconds=60)).isoformat()
 
         return {
@@ -331,11 +339,11 @@ class RealtimeInterviewService:
     async def _upload_resume_to_s3(self, resume_file: UploadFile, session_id: str) -> Optional[str]:
         """Upload resume to S3 and return URL"""
         try:
-            # Generate S3 key
+            
             file_extension = os.path.splitext(resume_file.filename)[1]
             s3_key = f"ai-interview/resumes/{session_id}/{uuid.uuid4()}{file_extension}"
 
-            # Upload to S3
+            
             session = aioboto3.Session()
             async with session.client(
                 's3',
@@ -351,7 +359,7 @@ class RealtimeInterviewService:
                     ContentType=resume_file.content_type or 'application/pdf'
                 )
 
-            # Return S3 URL
+            
             s3_url = f"https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
             return s3_url
 
@@ -364,38 +372,38 @@ class RealtimeInterviewService:
         temp_file_path = None
         temp_output_dir = None
         try:
-            # Upload to S3 first
+            
             s3_url = await self._upload_resume_to_s3(resume_file, session_id)
             if not s3_url:
                 print("S3 upload failed, proceeding with extraction anyway")
 
-            # Create temp directories
+            
             os.makedirs("temp_resumes", exist_ok=True)
             os.makedirs("temp_output", exist_ok=True)
 
             temp_file_path = f"temp_resumes/resume_{session_id}_{resume_file.filename}"
             temp_output_dir = "temp_output"
 
-            # Reset file pointer and save locally
+            
             await resume_file.seek(0)
             async with aiofiles.open(temp_file_path, "wb") as f:
                 content = await resume_file.read()
                 await f.write(content)
 
-            # Extract text using extractipy (with output directory like material management)
+            
             from extractipy.file_extractors import FileExtractor
             extractor = FileExtractor(verbose=False)
             extracted_data = await extractor.extract_data_from_file(temp_file_path, temp_output_dir)
             resume_context = extracted_data.get('text', '')
 
-            # Clean up temp files immediately
+            
             if os.path.exists(temp_file_path):
                 try:
                     os.remove(temp_file_path)
                 except Exception as cleanup_error:
                     print(f"Cleanup warning: {str(cleanup_error)}")
 
-            # Clean up extracted output file
+            
             if temp_output_dir:
                 import glob
                 for f in glob.glob(os.path.join(temp_output_dir, "*")):
@@ -408,7 +416,7 @@ class RealtimeInterviewService:
 
         except Exception as e:
             print(f"Resume extraction error: {str(e)}")
-            # Ensure cleanup even on error
+            
             if temp_file_path and os.path.exists(temp_file_path):
                 try:
                     os.remove(temp_file_path)
@@ -441,9 +449,9 @@ class RealtimeInterviewService:
                         },
                         "turn_detection": {
                             "type": "server_vad",
-                            "threshold": 0.5,  # Lowered to 0.4 to prevent cutting off quiet speech (was 0.5)
-                            "prefix_padding_ms": 300,  # Reduced padding to prevent capturing tail of AI voice (was 1000)
-                            "silence_duration_ms": 4000  # 4-second rule as requested
+                            "threshold": 0.5,  
+                            "prefix_padding_ms": 300,  
+                            "silence_duration_ms": 4000  
                         },
                         "temperature": 0.8,
                         "max_response_output_tokens": 4096
@@ -513,10 +521,10 @@ class RealtimeInterviewService:
     ) -> str:
         """Create system instructions using HR_SCREENING_SYSTEM_PROMPT"""
 
-        # Format questions context
+        
         questions_context = mandatory_questions if mandatory_questions else "No specific pre-defined questions."
 
-        # Format the system prompt
+        
         instructions = HR_SCREENING_SYSTEM_PROMPT.format(
             role=role,
             duration=f"{duration} minutes",
@@ -524,7 +532,7 @@ class RealtimeInterviewService:
             questions_context=questions_context
         )
 
-        # Log the interview configuration for debugging
+        
         logger.info(f"System instructions created from HR_SCREENING_SYSTEM_PROMPT - Role: {role}, Duration: {duration} mins")
 
         return instructions
@@ -555,7 +563,7 @@ class RealtimeInterviewService:
         if mongodb_collection is None:
             raise CustomException("Database not available", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        # Parse conversation JSON
+        
         try:
             conversation = json.loads(conversation_json)
             if not isinstance(conversation, list):
@@ -566,49 +574,47 @@ class RealtimeInterviewService:
         agent = AIInterviewAgent()
         processed_conversation = await agent.process_conversation(conversation)
 
-        # Calculate Realtime API tokens from conversation
-        # The conversation contains all AI and user exchanges during the interview
+        
         try:
             encoding = tiktoken.encoding_for_model("gpt-4o-mini")
             total_conversation_tokens = 0
             total_audio_duration_seconds = 0
 
             for message in conversation:
-                # Count text tokens from message content
+                
                 if isinstance(message, dict):
-                    # Get message content (from 'content' or 'transcript' field)
+                    
                     text_content = message.get("content", "") or message.get("transcript", "")
                     if text_content:
                         total_conversation_tokens += len(encoding.encode(text_content))
 
-                    # Track audio duration if available (for Whisper cost)
-                    # Check multiple possible field names for audio duration
+                    
                     audio_duration = (
                         message.get("audio_duration_ms", 0) or
                         message.get("audio_duration", 0) or
                         0
                     )
                     if audio_duration:
-                        # Convert to seconds if in milliseconds (value > 1000 likely means ms)
+                        
                         if audio_duration > 1000:
                             total_audio_duration_seconds += audio_duration / 1000
                         else:
                             total_audio_duration_seconds += audio_duration
 
-            # If no audio duration in messages, estimate from interview duration
-            # Get session to check interview duration
+            
+            
             session = await self.mongo_repo.get_session_by_id(mongodb_collection, session_id)
             if session and total_audio_duration_seconds == 0:
-                # Use interview duration as fallback for audio duration
+                
                 interview_duration_minutes = session.get("duration", 0)
                 total_audio_duration_seconds = interview_duration_minutes * 60
                 logger.info(f"Using interview duration as audio duration: {interview_duration_minutes} minutes")
 
         except Exception as e:
             logger.warning(f"Error calculating conversation tokens: {e}")
-            total_conversation_tokens = len(str(conversation)) // 4  # Fallback estimation
+            total_conversation_tokens = len(str(conversation)) // 4  
 
-            # Estimate audio duration from interview duration
+            
             session = await self.mongo_repo.get_session_by_id(mongodb_collection, session_id)
             if session:
                 interview_duration_minutes = session.get("duration", 0)
@@ -616,17 +622,11 @@ class RealtimeInterviewService:
             else:
                 total_audio_duration_seconds = 0
 
-        # Calculate Whisper transcription cost
-        # Whisper pricing: $0.006 per minute
+        
         audio_duration_minutes = total_audio_duration_seconds / 60
         whisper_cost = audio_duration_minutes * 0.006
 
-        # Calculate Realtime API cost for conversation
-        # gpt-4o-mini-realtime-preview pricing:
-        # - Text input: $0.60 per 1M tokens
-        # - Text output: $2.40 per 1M tokens
-        # Note: We're estimating 50/50 split between user (input) and AI (output)
-        # For more accurate calculation, we'd need to track input/output separately
+       
         estimated_input_tokens = total_conversation_tokens // 2
         estimated_output_tokens = total_conversation_tokens - estimated_input_tokens
 
@@ -634,11 +634,11 @@ class RealtimeInterviewService:
         realtime_output_cost = (estimated_output_tokens / 1_000_000) * 2.40
         realtime_api_cost = realtime_input_cost + realtime_output_cost
 
-        # Get current session to update token usage
+        
         session = await self.mongo_repo.get_session_by_id(mongodb_collection, session_id)
         current_token_usage = session.get("token_usage", {}) if session else {}
 
-        # Update token usage with conversation data
+        
         updated_token_usage = {
             "system_instructions_tokens": current_token_usage.get("system_instructions_tokens", 0),
             "realtime_api_tokens": total_conversation_tokens,
@@ -653,7 +653,7 @@ class RealtimeInterviewService:
             "evaluation_cost_usd": current_token_usage.get("evaluation_cost_usd", 0.0)
         }
 
-        # Calculate interim total (before evaluation)
+        
         interim_total_tokens = (
             updated_token_usage["system_instructions_tokens"] +
             updated_token_usage["realtime_api_tokens"]
@@ -663,7 +663,7 @@ class RealtimeInterviewService:
         updated_token_usage["total_tokens"] = interim_total_tokens
         updated_token_usage["total_cost_usd"] = round(interim_total_cost, 6)
 
-        # Update session with conversation AND token usage
+        
         result = await self.mongo_repo.update_conversation_and_tokens(
             mongodb_collection,
             session_id,
@@ -701,11 +701,11 @@ class RealtimeInterviewService:
         if not session:
             raise CustomException("Session not found", status_code=status.HTTP_404_NOT_FOUND)
 
-        # Allow evaluation for both "completed" and "evaluated" status (for re-evaluation)
+        
         if session.get("status") not in ["completed", "evaluated"]:
             raise CustomException("Interview not completed yet", status_code=status.HTTP_400_BAD_REQUEST)
 
-        # Get conversation transcript
+       
         conversation = session.get("conversation", [])
 
         if not conversation:
@@ -714,30 +714,30 @@ class RealtimeInterviewService:
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
-        # Initialize evaluation service
+        
         from services.ai_interview_management.realtime_interview_evaluation_service import RealtimeInterviewEvaluationService
         evaluation_service = RealtimeInterviewEvaluationService()
 
-        # Evaluate the interview
+        
         evaluation_data = await evaluation_service.evaluate_interview_session(
             session_data=session,
             conversation_transcript=conversation,
             passing_score=passing_score
         )
 
-        # Store evaluation in database
+        
         await self.mongo_repo.save_evaluation(mongodb_collection, session_id, evaluation_data)
 
-        # === NEW: Notify External Backend (Fire-and-Forget) ===
+        
         front_end_id = session.get("front_end_session_id")
-        session_token = session.get("token", "")  # Get token from session data
+        session_token = session.get("token", "")  
         if front_end_id:
-            # Extract result status (default to FAIL if missing)
+            
             result_status = evaluation_data.get("overall_evaluation", {}).get("result", "fail")
-            # Extract total score
+            
             total_score = evaluation_data.get("overall_evaluation", {}).get("total_score", 0.0)
             
-            # Run in background
+            
             import asyncio
             asyncio.create_task(self._notify_external_backend(
                 front_end_session_id=front_end_id,
@@ -760,7 +760,7 @@ class RealtimeInterviewService:
             interviewers_db = await repo.get_all_interviewers()
 
             if interviewers_db and len(interviewers_db) > 0:
-                # Database has interviewers - use them
+                
                 interviewers = []
                 for interviewer in interviewers_db:
                     interviewers.append({
@@ -780,7 +780,7 @@ class RealtimeInterviewService:
         except Exception as e:
             logger.warning(f"Database query failed, using mock data: {e}")
         
-        # Fallback: Return mock interviewers for testing (POC mode)
+        
         logger.info("Using mock interviewer data (database not available)")
         return [
             {
@@ -854,7 +854,7 @@ class RealtimeInterviewService:
         Returns:
             Complete interview details including evaluation
         """
-        # Repository layer: Fetch session (no user verification for POC)
+        
         session = await self.mongo_repo.get_session_by_id(
             mongodb_collection, session_id
         )
@@ -865,16 +865,16 @@ class RealtimeInterviewService:
                 status_code=status.HTTP_404_NOT_FOUND
             )
 
-        # Business logic: Extract and format evaluation data
+        
         evaluation = session.get("evaluation", {})
         overall_evaluation = evaluation.get("overall_evaluation", {})
         questions = evaluation.get("questions", [])
 
-        # Business logic: Format interviewer details
+        
         interviewer_name = session.get("interviewer_name", "Unknown")
         interviewer_initials = "".join([word[0].upper() for word in interviewer_name.split()[:2]])
 
-        # Business logic: Build formatted response
+        
         interview_details = {
             "session_id": session.get("session_id"),
             "front_end_session_id": session.get("front_end_session_id"),
@@ -939,12 +939,12 @@ class RealtimeInterviewService:
         Raises:
             CustomException: If session not found
         """
-        # Repository layer: Perform soft delete operation (no user check)
+        
         result = await self.mongo_repo.soft_delete_session_by_id(
             mongodb_collection, session_id
         )
 
-        # Business logic: Verify deletion was successful
+        
         if result.matched_count == 0:
             raise CustomException(
                 "Interview session not found or you don't have access to it",
@@ -970,12 +970,12 @@ class RealtimeInterviewService:
         Raises:
             CustomException: If session not found
         """
-        # Repository layer: Perform hard delete operation
+        
         result = await self.mongo_repo.hard_delete_session_by_id(
             mongodb_collection, session_id
         )
 
-        # Business logic: Verify deletion was successful
+        
         if result.deleted_count == 0:
             raise CustomException(
                 "Interview session not found",
@@ -1005,7 +1005,7 @@ class RealtimeInterviewService:
         Raises:
             CustomException: If session not found
         """
-        # Repository layer: Fetch session (no user verification)
+        
         session = await self.mongo_repo.get_session_by_id(
             mongodb_collection, session_id
         )
@@ -1016,10 +1016,10 @@ class RealtimeInterviewService:
                 status_code=status.HTTP_404_NOT_FOUND
             )
 
-        # Business logic: Extract token usage data
+        
         token_usage = session.get("token_usage", {})
 
-        # Fallback: If conversation tokens are 0 but conversation exists, recalculate
+        
         if token_usage.get("realtime_api_tokens", 0) == 0 and session.get("conversation"):
             try:
                 import tiktoken
@@ -1033,20 +1033,20 @@ class RealtimeInterviewService:
                         if text_content:
                             total_conversation_tokens += len(encoding.encode(text_content))
 
-                # Calculate Realtime API cost
+                
                 estimated_input_tokens = total_conversation_tokens // 2
                 estimated_output_tokens = total_conversation_tokens - estimated_input_tokens
                 realtime_input_cost = (estimated_input_tokens / 1_000_000) * 0.60
                 realtime_output_cost = (estimated_output_tokens / 1_000_000) * 2.40
                 realtime_api_cost = realtime_input_cost + realtime_output_cost
 
-                # Update token_usage with recalculated values
+                
                 token_usage["realtime_api_tokens"] = total_conversation_tokens
                 token_usage["realtime_api_input_tokens"] = estimated_input_tokens
                 token_usage["realtime_api_output_tokens"] = estimated_output_tokens
                 token_usage["realtime_api_cost_usd"] = round(realtime_api_cost, 6)
 
-                # If audio duration is 0, use interview duration as estimate
+                
                 if token_usage.get("realtime_audio_duration_seconds", 0) == 0:
                     interview_duration_minutes = session.get("duration", 0)
                     audio_duration_seconds = interview_duration_minutes * 60
@@ -1055,7 +1055,7 @@ class RealtimeInterviewService:
                     token_usage["realtime_audio_duration_seconds"] = audio_duration_seconds
                     token_usage["whisper_transcription_cost_usd"] = round(whisper_cost, 6)
 
-                    # Recalculate COMPLETE total cost with ALL components
+                    
                     total_cost = (
                         token_usage.get("realtime_api_cost_usd", 0.0) +
                         token_usage.get("whisper_transcription_cost_usd", 0.0) +
@@ -1063,7 +1063,7 @@ class RealtimeInterviewService:
                     )
                     token_usage["total_cost_usd"] = round(total_cost, 6)
 
-                    # Recalculate total tokens
+                    
                     total_tokens = (
                         token_usage.get("system_instructions_tokens", 0) +
                         token_usage.get("realtime_api_tokens", 0) +
@@ -1076,7 +1076,7 @@ class RealtimeInterviewService:
             except Exception as e:
                 logger.warning(f"Error recalculating conversation tokens: {e}")
 
-        # Business logic: Build formatted token usage summary with ALL cost components
+        
         token_summary = {
             "session_id": session.get("session_id"),
             "interview_role": session.get("interview_role"),

@@ -2,7 +2,7 @@ from pydantic import BaseModel, field_serializer
 from datetime import datetime
 from uuid import UUID
 
-# Real-time Interview Session Response DTOs
+
 class InterviewSessionResponseDTO(BaseModel):
     """Response for interview session"""
     id: int
@@ -63,7 +63,7 @@ class QuestionFeedbackDTO(BaseModel):
     question: QuestionResponseDTO
     user_answer: str
     score: float
-    feedback_label: str  # Excellent, Good, Fair, Poor
+    feedback_label: str  
     what_went_well: str
     areas_to_improve: str
     improved_answer: str | None
@@ -90,7 +90,7 @@ class InterviewerDTO(BaseModel):
     id: str
     name: str
     voice_id: str
-    gender: str  # "male" or "female"
+    gender: str  
     accent: str | None
     description: str | None
 
@@ -106,8 +106,8 @@ class InterviewHistoryItemDTO(BaseModel):
     interview_round: str
     interview_date: datetime
     duration_minutes: int
-    overall_score: int | None  # Total score out of 100
-    status: str  # "completed", "in_progress", "evaluated"
+    overall_score: int | None  
+    status: str  
 
     class Config:
         from_attributes = True

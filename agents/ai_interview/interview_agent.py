@@ -54,12 +54,12 @@ class AIInterviewAgent:
             List of question dictionaries
         """
         try:
-            # Build context strings
+            
             questions_context = ""
             if questions_list:
                 questions_context = "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions_list)])
 
-            # Format prompt
+            
             prompt_text = QUESTION_GENERATOR_PROMPT.format(
                 role=role,
                 duration=f"{duration} minutes",
@@ -67,13 +67,13 @@ class AIInterviewAgent:
                 questions_context=questions_context
             )
 
-            # Generate questions
+            
             response = await self.llm.ainvoke([HumanMessage(content=prompt_text)])
 
-            # Parse JSON response
+            
             questions_json = response.content.strip()
 
-            # Remove markdown code blocks if present
+            
             if questions_json.startswith("```json"):
                 questions_json = questions_json.replace("```json", "").replace("```", "").strip()
             elif questions_json.startswith("```"):
@@ -81,7 +81,7 @@ class AIInterviewAgent:
 
             questions = json.loads(questions_json)
 
-            # Ensure each question has required fields and add IDs
+            
             for idx, question in enumerate(questions):
                 question['question_id'] = f"q_{idx + 1}"
                 question.setdefault('order', idx + 1)
@@ -133,12 +133,12 @@ class AIInterviewAgent:
 
         text = text.strip()
 
-        # Remove ```json ... ``` or ``` ... ``` wrappers
+        
         if text.startswith("```"):
             text = re.sub(r"^```(json)?", "", text)
             text = text.replace("```", "").strip()
 
-        # Extract JSON object if extra text exists
+        
         match = re.search(r"(\{.*\})", text, re.DOTALL)
         if match:
             return match.group(1).strip()
@@ -158,17 +158,17 @@ class AIInterviewAgent:
         if not isinstance(data, dict):
             return False
         
-        # Check if 'conversation' key exists
+        
         if "conversation" not in data:
             return False
         
         conversation = data["conversation"]
         
-        # Validate conversation is a list
+        
         if not isinstance(conversation, list):
             return False
         
-        # Validate each message in the conversation
+        
         for i, msg in enumerate(conversation):
             if not isinstance(msg, dict):
                 return False
@@ -179,11 +179,11 @@ class AIInterviewAgent:
             if not isinstance(msg["content"], str):
                 return False
             
-            # Check alternating pattern (assistant, user, assistant, user, ...)
-            if i % 2 == 0:  # Even indices should be assistant
+            
+            if i % 2 == 0: 
                 if msg["role"] != "assistant":
                     logger.warning(f"Expected assistant at index {i}, got {msg['role']}")
-            else:  # Odd indices should be user
+            else:  
                 if msg["role"] != "user":
                     logger.warning(f"Expected user at index {i}, got {msg['role']}")
 
@@ -203,24 +203,24 @@ class AIInterviewAgent:
         Raises:
             ValueError: If LLM output is malformed
         """
-        # Convert messages into readable format
+        
         conversation_text = "\n".join([
             f"{msg['role'].upper()}: {msg['content']}"
             for msg in raw_conversation
         ])
 
-        # Create prompt using the imported EXTRACT_QA_PROMPT
+        
         extract_prompt = ChatPromptTemplate.from_template(EXTRACT_QA_PROMPT)
         formatted_prompt = extract_prompt.format_messages(conversation=conversation_text)
 
-        # Invoke LLM
+        
         response = await self.conversation_processor_llm.ainvoke(formatted_prompt)
         raw_output = response.content or ""
 
-        # Clean and parse response
+        
         cleaned_output = self._clean_llm_output(raw_output)
 
-        # Parse JSON strictly
+        
         try:
             parsed_json = json.loads(cleaned_output)
         except json.JSONDecodeError as e:
@@ -233,7 +233,7 @@ class AIInterviewAgent:
             logger.error(f"Expected dict but got {type(parsed_json)}")
             raise ValueError("Output must be a JSON object with 'conversation' key.")
 
-        # Validate output structure
+        
         if not self._validate_output(parsed_json):
             logger.error(f"Invalid output structure: {parsed_json}")
             raise ValueError("Output does not match required format")
@@ -288,7 +288,7 @@ class AIInterviewAgent:
             ValueError: If conversation is empty or invalid
         """
         try:
-            # Validate input
+            
             if not raw_conversation:
                 logger.warning("Empty conversation provided, returning empty conversation")
                 return {"conversation": []}
@@ -299,14 +299,14 @@ class AIInterviewAgent:
 
             logger.info(f"Processing conversation with {len(raw_conversation)} messages")
 
-            # Normalize input (remove timestamps and extra fields)
+            
             normalized_conversation = self._normalize_input(raw_conversation)
 
             if not normalized_conversation:
                 logger.warning("No valid messages after normalization")
                 return {"conversation": []}
 
-            # Extract Q&A pairs using LLM (returns in flat conversation format)
+            
             result = await self._extract_qa_pairs_from_conversation(normalized_conversation)
 
             logger.info(f"Successfully processed conversation")
@@ -340,7 +340,7 @@ class AIInterviewAgent:
             Dictionary with evaluation scores and feedback
         """
         try:
-            # Format prompt
+            
             prompt_text = ANSWER_EVALUATOR_PROMPT.format(
                 difficulty=difficulty,
                 interview_round=interview_round,
@@ -350,13 +350,13 @@ class AIInterviewAgent:
                 user_answer=user_answer
             )
 
-            # Evaluate answer
+            
             response = await self.evaluator_llm.ainvoke([HumanMessage(content=prompt_text)])
 
-            # Parse JSON response
+            
             evaluation_json = response.content.strip()
 
-            # Remove markdown code blocks if present
+            
             if evaluation_json.startswith("```json"):
                 evaluation_json = evaluation_json.replace("```json", "").replace("```", "").strip()
             elif evaluation_json.startswith("```"):
@@ -397,10 +397,10 @@ class AIInterviewAgent:
             Dictionary with overall performance metrics
         """
         try:
-            # Format question evaluations for prompt
+            
             evaluations_text = json.dumps(question_evaluations, indent=2)
 
-            # Format prompt
+            
             prompt_text = OVERALL_PERFORMANCE_EVALUATOR_PROMPT.format(
                 role=role,
                 interview_round=interview_round,
@@ -409,13 +409,13 @@ class AIInterviewAgent:
                 question_evaluations=evaluations_text
             )
 
-            # Generate overall evaluation
+            
             response = await self.evaluator_llm.ainvoke([HumanMessage(content=prompt_text)])
 
-            # Parse JSON response
+            
             evaluation_json = response.content.strip()
 
-            # Remove markdown code blocks if present
+            
             if evaluation_json.startswith("```json"):
                 evaluation_json = evaluation_json.replace("```json", "").replace("```", "").strip()
             elif evaluation_json.startswith("```"):

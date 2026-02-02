@@ -3,11 +3,10 @@ from config.env_loader import load_env
 
 load_env()  
 
-# POC Mode: Only require essential environment variables
+
 REQUIRED_ENV_VARS = [
-    "OPENAI_API_KEY",      # Required for OpenAI Realtime API
-    "MONGO_URI",           # Required for session storage
-    "GOOGLE_API_KEY",      # Required for session middleware
+    "OPENAI_API_KEY",      
+    "MONGO_URI",
 ]
 
 def validate_required_env_vars() -> None:

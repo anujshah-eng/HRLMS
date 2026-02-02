@@ -5,7 +5,7 @@ from bson import ObjectId
 from enums.ai_interview import InterviewStatus, InterviewLevel
 
 
-# Helper for MongoDB ObjectId
+
 class PyObjectId(ObjectId):
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type, handler):
@@ -36,8 +36,7 @@ class Interview(BaseModel):
     role_id: int
     company_id: int
     interview_round: Optional[str] = None
-    resume_url: Optional[str] = None
-    # target_company: Optional[str] = None
+
     job_description: Optional[str] = None
     number_of_questions: Optional[int] = None
     interviewer_name: Optional[str] = None

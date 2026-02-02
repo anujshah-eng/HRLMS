@@ -9,7 +9,7 @@ from config.env_validator import validate_required_env_vars
 from routers import ai_interview_management
 from connections.mongo_connection import MotorMongoDBResourceManager
 
-# Configure logging
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -45,7 +45,8 @@ async def lifespan(fastapi_app: FastAPI):
         fastapi_app.state.mongo_manager.close()
     print("Application shutdown completed!")
 
-# Initialize FastAPI app
+
+
 app = FastAPI(
     title="Acelucid HRMS",
     version="1.0",
@@ -53,7 +54,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Middleware setup
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -65,19 +66,19 @@ app.add_middleware(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("GOOGLE_API_KEY", "fallback-secret")  # fallback to avoid crash
+    secret_key=os.getenv("SECRET_KEY", "fallback-secret")  
 )
 
 
 
-# Include routers
+
 app.include_router(
     ai_interview_management.router,
     prefix="/aiInterviewManagement",
     tags=["AI Interview Management"]
 )
 
-# Root endpoint
+
 @app.get("/")
 async def root():
     """Root endpoint with API information."""
@@ -88,7 +89,7 @@ async def root():
         "redoc": "/redoc"
     }
 
-# Entrypoint for running locally
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(

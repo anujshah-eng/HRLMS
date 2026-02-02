@@ -11,11 +11,11 @@ class AIInterviewRolesRepository:
             if self.collection is None:
                 return []
             
-            # Fetch active interviewers
+            
             cursor = self.collection.find({"is_active": True})
             interviewers_data = await cursor.to_list(length=100)
             
-            # Convert to Pydantic models
+            
             return [AIInterviewer(**data) for data in interviewers_data]
         except Exception as e:
             raise Exception(f"Database error: {str(e)}")
@@ -26,7 +26,7 @@ class AIInterviewRolesRepository:
             if self.collection is None:
                 return None
 
-            # Fetch specific interviewer by ID (handling integer ID)
+            
             result = await self.collection.find_one({
                 "id": interviewer_id,
                 "is_active": True
@@ -119,14 +119,14 @@ class RealtimeInterviewMongoRepository:
 
     async def save_evaluation(self, mongodb_collection, session_id: str, evaluation_data: dict):
         """Save evaluation data to session and update complete token usage with all costs"""
-        # Extract token usage from evaluation data
+        
         evaluation_tokens = evaluation_data.get("token_usage", {})
 
-        # Get current session to merge token usage
+        
         session = await mongodb_collection.find_one({"_id": session_id})
         current_token_usage = session.get("token_usage", {}) if session else {}
 
-        # Merge token usage with all components
+        
         updated_token_usage = {
             "system_instructions_tokens": current_token_usage.get("system_instructions_tokens", 0),
             "realtime_api_tokens": current_token_usage.get("realtime_api_tokens", 0),
@@ -141,17 +141,14 @@ class RealtimeInterviewMongoRepository:
             "evaluation_cost_usd": evaluation_tokens.get("evaluation_cost_usd", 0.0)
         }
 
-        # Calculate total tokens across entire interview
+        
         total_tokens = (
             updated_token_usage["system_instructions_tokens"] +
             updated_token_usage["realtime_api_tokens"] +
             updated_token_usage["evaluation_total_tokens"]
         )
 
-        # Calculate COMPLETE total cost including ALL components:
-        # 1. Realtime API cost (conversation with gpt-4o-mini-realtime-preview)
-        # 2. Whisper transcription cost (audio -> text)
-        # 3. Evaluation cost (GPT-4o-mini for answer + overall evaluation)
+        
         total_cost = (
             updated_token_usage["realtime_api_cost_usd"] +
             updated_token_usage["whisper_transcription_cost_usd"] +
@@ -159,7 +156,7 @@ class RealtimeInterviewMongoRepository:
         )
 
         updated_token_usage["total_tokens"] = total_tokens
-        # updated_token_usage["total_cost_usd"] = round(total_cost, 6)
+        
 
         result = await mongodb_collection.update_one(
             {"_id": session_id},

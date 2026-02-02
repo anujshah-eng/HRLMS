@@ -16,16 +16,16 @@ class MotorMongoDBResourceManager:
         self.client: AsyncIOMotorClient | None = None
         self.db = None
 
-        # Support simple MONGO_URI or individual credentials
+        
         mongo_uri = os.getenv("MONGO_URI")
         
         if mongo_uri:
-            # Simple URI format (for local MongoDB or pre-formatted connection strings)
+            
             self.uri = mongo_uri
-            # Extract database name from URI or use default
+          
             self.db_name = os.getenv("MONGO_DB_NAME", "ai_interview")
         else:
-            # MongoDB Atlas format with individual credentials
+            
             self.db_name = os.getenv("MONGO_DB_NAME", "ai_interview")
             username = quote_plus(os.getenv("MONGO_USER", ""))
             password = quote_plus(os.getenv("MONGO_PASSWORD", ""))
@@ -42,11 +42,11 @@ class MotorMongoDBResourceManager:
         try:
             self.client = AsyncIOMotorClient(
                 self.uri,
-                serverSelectionTimeoutMS=5000  # 5s timeout
+                serverSelectionTimeoutMS=5000 
             )
             self.db = self.client[self.db_name]
 
-            # Test connection
+           
             try:
                 await self.db.command("ping")
                 print(f"✅ MongoDB connected to database '{self.db_name}'")

@@ -8,7 +8,7 @@ from custom_utilities.dependencies import get_realtime_interview_collection, get
 router = APIRouter()
 realtime_service = RealtimeInterviewService()
 
-# Realtime Interview Endpoints
+
 @router.post("/realtime-interview/session", response_model=ResponseDto)
 async def create_ephemeral_session(
     role_title: str = Form(...),
@@ -16,15 +16,15 @@ async def create_ephemeral_session(
     interviewer_id: int = Form(...),
     front_end_session_id: int = Form(...),
     candidate_id: int = Form(...),
-    token: str = Form(...),  # Authentication token from frontend
+    token: str = Form(...),  
     job_description: Optional[str] = Form(None),
-    skills: Optional[str] = Form(None),  # JSON string of list[str]
-    questions: Optional[str] = Form(None), # JSON string of list[dict]
+    skills: Optional[str] = Form(None), 
+    questions: Optional[str] = Form(None), 
     microphone_status: bool = Form(...),
     camera_status: bool = Form(...),
-    passing_score: Optional[int] = Form(None), # Capture passing score from frontend
-    # internet_status: bool = Form(...),
-    # internet_speed_mbps: Optional[float] = Form(None),
+    passing_score: Optional[int] = Form(None), 
+    
+    
     
     mongodb_collection = Depends(get_realtime_interview_collection),
     ai_interviewers_collection = Depends(get_ai_interviewers_collection)
@@ -67,12 +67,12 @@ async def create_ephemeral_session(
             job_description=job_description,
             skills=skills,
             questions=questions,
-            # Required compatibility params
+            
             microphone_status=microphone_status,
             camera_status=camera_status,
             passing_score=passing_score
-            # internet_status=internet_status,
-            # internet_speed_mbps=internet_speed_mbps
+            
+            
         )
 
         return ResponseDto(

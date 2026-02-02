@@ -29,7 +29,7 @@ class RealtimeInterviewService:
         self.agent = AIInterviewAgent()
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         
-        self.transcription_model = os.getenv("TRANSCRIPTION_MODEL", "whisper-1")
+        self.transcription_model = os.getenv("TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
 
         
         self.s3_bucket_name = os.getenv("S3_BUCKET_NAME")

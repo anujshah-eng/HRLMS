@@ -44,7 +44,7 @@ class RealtimeInterviewService:
         Notify external backend about interview completion.
         This runs in the background to avoid blocking the user response.
         """
-        url = os.getenv("EXTERNAL_STATUS_API_URL", "https://lms.acelucid.com")
+        url = os.getenv("EXTERNAL_STATUS_API_URL", "https://lms.acelucid.com/api/ai/session/status")
         
         
         final_score = int(round(score)) if score is not None else 0

@@ -908,7 +908,7 @@ class RealtimeInterviewService:
             candidate_id: Candidate ID
             
         Returns:
-            Evaluation object
+            Evaluation object with total_score from overall_evaluation
         """
         session = await self.mongo_repo.get_session_by_frontend_and_candidate(
             mongodb_collection, 
@@ -918,8 +918,18 @@ class RealtimeInterviewService:
         
         if not session:
             raise CustomException("Session not found", status_code=status.HTTP_404_NOT_FOUND)
+        
+        evaluation = session.get("evaluation")
+        
+        if not evaluation:
+            raise CustomException("Evaluation not found for this session", status_code=status.HTTP_404_NOT_FOUND)
+        
+        # Ensure the total_score from overall_evaluation is exposed at the top level
+        # This fixes the issue where API was showing performance breakdown scores instead
+        if "overall_evaluation" in evaluation and "total_score" in evaluation["overall_evaluation"]:
+            evaluation["total_score"] = evaluation["overall_evaluation"]["total_score"]
             
-        return session.get("evaluation")
+        return evaluation
 
     async def delete_interview_by_session_id(
         self,

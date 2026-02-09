@@ -340,14 +340,16 @@ async def get_interview_details(
 async def get_interview_evaluation(
     front_end_session_id: int,
     candidate_id: int,
+    token: str,
     mongodb_collection = Depends(get_realtime_interview_collection)
 ):
     """
-    Get evaluation object by front_end_session_id and candidate_id.
+    Get evaluation object by front_end_session_id, candidate_id, and token.
     
     Query Parameters:
     - front_end_session_id: Frontend session ID
     - candidate_id: Candidate ID
+    - token: Session authentication token
     
     Returns:
     - Evaluation object containing score, feedback, breakdown etc.
@@ -356,7 +358,8 @@ async def get_interview_evaluation(
         evaluation = await realtime_service.get_evaluation_by_session_id(
             mongodb_collection=mongodb_collection,
             front_end_session_id=front_end_session_id,
-            candidate_id=candidate_id
+            candidate_id=candidate_id,
+            token=token
         )
 
         return ResponseDto(

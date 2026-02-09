@@ -897,15 +897,17 @@ class RealtimeInterviewService:
         self,
         mongodb_collection,
         front_end_session_id: int,
-        candidate_id: int
+        candidate_id: int,
+        token: str
     ) -> dict:
         """
-        Get only the evaluation object by front_end_session_id and candidate_id.
+        Get only the evaluation object by front_end_session_id, candidate_id, and token.
         
         Args:
             mongodb_collection: MongoDB collection for interviews
             front_end_session_id: Front end session ID
             candidate_id: Candidate ID
+            token: Session authentication token
             
         Returns:
             Evaluation object with total_score from overall_evaluation
@@ -913,7 +915,8 @@ class RealtimeInterviewService:
         session = await self.mongo_repo.get_session_by_frontend_and_candidate(
             mongodb_collection, 
             front_end_session_id, 
-            candidate_id
+            candidate_id,
+            token
         )
         
         if not session:

@@ -212,11 +212,14 @@ class RealtimeInterviewService:
         
         
         if final_questions_list:
-            q_texts = []
+            q_texts = ["**MANDATORY QUESTIONS (Ask ALL in order):**"]
             for i, q in enumerate(final_questions_list):
                  q_type = f"[{q['type']}] " if q.get('type') != 'general' else ""
                  q_texts.append(f"{i+1}. {q_type}{q['question_text']}")
             questions_context_str = "\n".join(q_texts)
+        else:
+            questions_context_str = "None provided. Generate your own questions from the job description."
+
 
 
         

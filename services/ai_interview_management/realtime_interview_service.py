@@ -524,21 +524,25 @@ class RealtimeInterviewService:
     ) -> str:
         """Create system instructions using HR_SCREENING_SYSTEM_PROMPT"""
 
-        
         questions_context = mandatory_questions if mandatory_questions else "No specific pre-defined questions."
 
-        
+        # Compute the minimum question count from the duration
+        # Formula: 1 question per 2 minutes, with a minimum floor of 3
+        # e.g. 5min→3, 10min→5, 15min→7, 20min→10, 25min→12, 30min→15
+        min_questions = max(3, duration // 2)
+
         instructions = HR_SCREENING_SYSTEM_PROMPT.format(
             role=role,
             duration=f"{duration} minutes",
+            min_questions=min_questions,
             job_description_context=job_description or "No specific job description provided.",
             questions_context=questions_context
         )
 
-        
-        logger.info(f"System instructions created from HR_SCREENING_SYSTEM_PROMPT - Role: {role}, Duration: {duration} mins")
+        logger.info(f"System instructions created - Role: {role}, Duration: {duration} mins, Min Questions: {min_questions}")
 
         return instructions
+
 
     async def end_interview_session(self, mongodb_collection, session_id: str):
         """End interview session and mark as completed"""

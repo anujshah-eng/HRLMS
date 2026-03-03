@@ -139,6 +139,50 @@ async def end_interview_session(
         )
 
 
+@router.post("/realtime-interview/snapshot", response_model=ResponseDto)
+async def save_interview_snapshot(
+    session_id: str = Form(...),
+    image: UploadFile = File(..., description="JPEG screenshot from candidate's camera"),
+    mongodb_collection = Depends(get_realtime_interview_collection)
+):
+    """
+    Upload a proctoring screenshot to S3 and store the URL in MongoDB.
+
+    Called by the frontend every 60 seconds during the interview.
+    The image is uploaded to:  s3://hrms-ai-team/snapshots/{session_id}/{timestamp}.jpg
+
+    The stored URL is appended to the interview session document under the 'snapshots' array.
+    """
+    try:
+        image_bytes = await image.read()
+        result = await realtime_service.upload_snapshot(
+            mongodb_collection=mongodb_collection,
+            session_id=session_id,
+            image_bytes=image_bytes,
+            content_type=image.content_type or "image/jpeg",
+        )
+        return ResponseDto(
+            Data=result,
+            Success=True,
+            Message="Snapshot uploaded successfully",
+            Status=status.HTTP_200_OK
+        )
+    except CustomException as e:
+        return ResponseDto(
+            Data=None,
+            Success=False,
+            Message=str(e),
+            Status=e.status_code
+        )
+    except Exception as e:
+        return ResponseDto(
+            Data=None,
+            Success=False,
+            Message=f"Failed to upload snapshot: {str(e)}",
+            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @router.post("/realtime-interview/update-conversation", response_model=ResponseDto)
 async def update_conversation(
     session_id: str = Form(...),

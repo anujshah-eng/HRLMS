@@ -265,5 +265,21 @@ class RealtimeInterviewMongoRepository:
         Returns:
             Delete result from MongoDB
         """
+
         result = await mongodb_collection.delete_one({"_id": session_id})
+        return result
+
+    async def append_snapshot_url(self, mongodb_collection, session_id: str, snapshot_url: str, captured_at: str):
+        """Append a screenshot URL to the interview session's snapshots array"""
+        result = await mongodb_collection.update_one(
+            {"_id": session_id},
+            {
+                "$push": {
+                    "snapshots": {
+                        "url": snapshot_url,
+                        "captured_at": captured_at
+                    }
+                }
+            }
+        )
         return result

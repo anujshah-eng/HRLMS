@@ -32,11 +32,57 @@ class RealtimeInterviewService:
         self.transcription_model = os.getenv("TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
 
         
-        self.s3_bucket_name = os.getenv("S3_BUCKET_NAME")
-        self.aws_region = os.getenv("AWS_REGION_NAME")
+        self.s3_bucket_name = os.getenv("AWS_S3_BUCKET_NAME")
+        self.aws_region = os.getenv("AWS_REGION", "ap-south-1")
         self.aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
         self.aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
         self.prompts_dir = Path(__file__).parent.parent.parent / "agents" / "ai_interview" / "system_prompts"
+
+
+    async def upload_snapshot(
+        self,
+        mongodb_collection,
+        session_id: str,
+        image_bytes: bytes,
+        content_type: str = "image/jpeg"
+    ) -> dict:
+        """Upload a candidate screenshot to S3 and save URL to MongoDB"""
+        if not self.s3_bucket_name or not self.aws_access_key or not self.aws_secret_key:
+            raise CustomException(
+                "AWS S3 credentials are not configured.",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        # Use URL-safe timestamp (no colons, plus signs, or spaces)
+        now = datetime.now(timezone.utc)
+        captured_at = now.isoformat()
+        safe_timestamp = now.strftime("%Y%m%d_%H%M%S")
+        s3_key = f"snapshots/{session_id}/{safe_timestamp}.jpg"
+
+        # Upload to S3
+        async with aioboto3.Session().client(
+            "s3",
+            region_name=self.aws_region,
+            aws_access_key_id=self.aws_access_key,
+            aws_secret_access_key=self.aws_secret_key,
+        ) as s3:
+            await s3.put_object(
+                Bucket=self.s3_bucket_name,
+                Key=s3_key,
+                Body=image_bytes,
+                ContentType=content_type,
+            )
+
+        snapshot_url = f"https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
+        logger.info(f"Snapshot uploaded for session {session_id}: {snapshot_url}")
+
+        # Save URL to MongoDB
+        if mongodb_collection is not None:
+            await self.mongo_repo.append_snapshot_url(
+                mongodb_collection, session_id, snapshot_url, captured_at
+            )
+
+        return {"snapshot_url": snapshot_url, "captured_at": captured_at}
 
 
     async def _notify_external_backend(self, front_end_session_id: int, status: str, score: float, token: str):
@@ -938,7 +984,10 @@ class RealtimeInterviewService:
         # This fixes the issue where API was showing performance breakdown scores instead
         if "overall_evaluation" in evaluation and "total_score" in evaluation["overall_evaluation"]:
             evaluation["total_score"] = evaluation["overall_evaluation"]["total_score"]
-            
+
+        # Attach proctoring snapshots from the session document
+        evaluation["snapshots"] = session.get("snapshots", [])
+
         return evaluation
 
     async def delete_interview_by_session_id(

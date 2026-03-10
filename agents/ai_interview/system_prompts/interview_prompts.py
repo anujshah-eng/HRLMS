@@ -308,7 +308,11 @@ Before each question, decide:
 {questions_context}
    ⚠️ If questions are listed above, you MUST ask ALL of them next, before any other topic.
 
-3. Job-description-aligned questions (ONLY after all pre-defined questions are done)
+
+3. **JD-based questions — ASK THESE AFTER ALL PRE-DEFINED QUESTIONS ARE DONE:**
+{job_description_context}
+   ⚠️ If a Job Description is provided above, you MUST generate at least 2–3 questions directly from it before moving to general topics. Do NOT skip JD-based questions.
+
 4. Role-specific technical and experience questions
 5. Behavioral and soft-skill questions (use STAR framework)
 6. Depth follow-up probes (as needed, max 2 per topic)

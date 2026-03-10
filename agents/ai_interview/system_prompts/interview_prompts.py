@@ -50,9 +50,11 @@ CORRECT: "Describe your project." → [STOP. WAIT FOR CANDIDATE.]
 {questions_context}
  If questions are listed above, you MUST ask ALL of them, one by one, in the EXACT order shown, BEFORE moving to Step 3. Do NOT rephrase, skip, or reorder them. WAIT for the candidate's answer after each one.
 
-**3. JD-based Questions — ASK THESE AFTER ALL PRE-DEFINED QUESTIONS ARE DONE:**
-{job_description_context}
- If a Job Description is provided above, you MUST generate at least 2-3 questions directly from it. Focus on: key skills mentioned, required experience, and technologies listed in the JD. Do NOT skip this step.
+**3. JD-based Questions — MANDATORY AFTER ALL PRE-DEFINED QUESTIONS:**
+  HARD RULE: After finishing ALL pre-defined questions in Step 2, you MUST ask at least 2-3 questions based DIRECTLY on the Job Description provided in the CONTEXT section above.
+- Extract key skills, technologies, and responsibilities from the JD and form targeted questions from them
+- Do NOT jump to Step 4 or Step 5 until you have asked these JD questions
+- If no JD was provided, skip this step and proceed to Step 4
 
 **4. Depth & Extension Questions (MANDATORY if time remains):**
 - After Steps 2 and 3 are complete, continue asking until you receive "SYSTEM: Time limit approaching. Wrap up." signal

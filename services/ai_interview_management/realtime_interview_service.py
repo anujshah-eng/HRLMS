@@ -36,6 +36,7 @@ class RealtimeInterviewService:
         self.aws_region = os.getenv("AWS_REGION", "ap-south-1")
         self.aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
         self.aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        self.s3_snapshot_folder = os.getenv("AWS_S3_SNAPSHOT_FOLDER", "snapshots")
         self.prompts_dir = Path(__file__).parent.parent.parent / "agents" / "ai_interview" / "system_prompts"
 
 
@@ -57,7 +58,7 @@ class RealtimeInterviewService:
         now = datetime.now(timezone.utc)
         captured_at = now.isoformat()
         safe_timestamp = now.strftime("%Y%m%d_%H%M%S")
-        s3_key = f"snapshots/{session_id}/{safe_timestamp}.jpg"
+        s3_key = f"{self.s3_snapshot_folder}/{session_id}/{safe_timestamp}.jpg"
 
         # Upload to S3
         async with aioboto3.Session().client(

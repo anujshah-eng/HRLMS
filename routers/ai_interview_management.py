@@ -261,7 +261,7 @@ async def evaluate_interview(
         )
 
         return ResponseDto(
-            Data=None,
+            Data=evaluation_data,
             Success=True,
             Message="Interview evaluation completed successfully",
             Status=status.HTTP_200_OK

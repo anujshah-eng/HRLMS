@@ -499,8 +499,8 @@ class RealtimeInterviewService:
                         },
                         "turn_detection": {
                             "type": "server_vad",
-                            "threshold": 0.5,  
-                            "prefix_padding_ms": 300,  
+                            "threshold": 0.3,  
+                            "prefix_padding_ms": 1000,  
                             "silence_duration_ms": 4000  
                         },
                         "temperature": 0.6,

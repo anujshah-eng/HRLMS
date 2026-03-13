@@ -581,12 +581,11 @@ class RealtimeInterviewService:
         instructions = HR_SCREENING_SYSTEM_PROMPT.format(
             role=role,
             duration=f"{duration} minutes",
-            min_questions=min_questions,
             job_description_context=job_description or "No specific job description provided.",
             questions_context=questions_context
         )
 
-        logger.info(f"System instructions created - Role: {role}, Duration: {duration} mins, Min Questions: {min_questions}")
+        logger.info(f"System instructions created - Role: {role}, Duration: {duration} mins")
 
         return instructions
 

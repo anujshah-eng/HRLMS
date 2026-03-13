@@ -18,7 +18,11 @@ from repository.ai_interview_management import AIInterviewRolesRepository, Realt
 from agents.ai_interview.interview_agent import AIInterviewAgent
 from agents.ai_interview.system_prompts.interview_prompts import HR_SCREENING_SYSTEM_PROMPT
 
+import re
+import unicodedata
+
 logger = logging.getLogger(__name__)
+
 
 class RealtimeInterviewService:
     """Service for managing realtime AI interviews using OpenAI Realtime API"""
@@ -603,6 +607,41 @@ class RealtimeInterviewService:
             "status": "completed"
         }
 
+    @staticmethod
+    def _filter_english_content(text: str) -> tuple[str, bool]:
+        """
+        Filter a candidate transcript to retain only English (Latin-script) content.
+        
+        Returns:
+            (filtered_text, was_non_english): 
+              - filtered_text: English-only content, or empty string if none remained.
+              - was_non_english: True if non-English content was detected and stripped.
+        """
+        if not text or not text.strip():
+            return "", False
+
+        # Match only ASCII printable characters (English letters, digits, punctuation, whitespace)
+        # Plus common Latin extended characters (accents, etc.)
+        # This strips Devanagari, Kannada, Tamil, Telugu, Kanji, Arabic, Cyrillic, etc.
+        english_only = re.sub(r'[^\x00-\x7F\u00C0-\u024F]+', ' ', text)
+
+        # Strip transliterated common non-English filler words
+        # (simple single words that are clearly non-English even in ASCII)
+        transliterated = {
+            'haan', 'nahi', 'nai', 'acha', 'accha', 'theek', 'hai', 'mein', 'aur',
+            'kya', 'bilkul', 'toh', 'bhai', 'yaar', 'ek', 'do', 'teen', 'char',
+            'taiyar', 'matlab', 'bas', 'abhi', 'chalega', 'thik', 'arre', 'nahin',
+            'ji', 'sahib', 'bhaiya', 'didi', 'bolo'
+        }
+        words = english_only.split()
+        cleaned_words = [w for w in words if w.lower().strip('.,!?;:') not in transliterated]
+        cleaned = ' '.join(cleaned_words).strip()
+
+        original_stripped = text.strip()
+        was_non_english = cleaned != original_stripped and len(original_stripped) > len(cleaned)
+
+        return cleaned, was_non_english
+
     async def update_conversation(
         self,
         mongodb_collection,
@@ -616,13 +655,31 @@ class RealtimeInterviewService:
         if mongodb_collection is None:
             raise CustomException("Database not available", status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        
         try:
             conversation = json.loads(conversation_json)
             if not isinstance(conversation, list):
                 raise ValueError("Conversation must be an array")
         except json.JSONDecodeError:
             raise CustomException("Invalid JSON format for conversation", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # ── Language Filter: strip non-English content from user messages ──
+        filtered_conversation = []
+        for msg in conversation:
+            if isinstance(msg, dict) and msg.get("role") == "user":
+                raw_content = msg.get("content", "") or msg.get("transcript", "")
+                filtered_content, had_non_english = self._filter_english_content(raw_content)
+                if had_non_english:
+                    if filtered_content:
+                        logger.info(f"Filtered non-English content from user message. Original: '{raw_content[:80]}' → Kept: '{filtered_content[:80]}'")
+                    else:
+                        # Entirely non-English: replace with flag so AI can issue English-only warning
+                        logger.info(f"Entirely non-English user message removed: '{raw_content[:80]}'")
+                        filtered_content = "[Non-English response — please respond in English]"
+                    msg = {**msg, "content": filtered_content}
+            filtered_conversation.append(msg)
+        conversation = filtered_conversation
+        # ──────────────────────────────────────────────────────────────────
+
 
         agent = AIInterviewAgent()
         processed_conversation = await agent.process_conversation(conversation)

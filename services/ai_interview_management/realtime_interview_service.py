@@ -501,7 +501,7 @@ class RealtimeInterviewService:
                             "type": "server_vad",
                             "threshold": 0.3,  
                             "prefix_padding_ms": 1000,  
-                            "silence_duration_ms": 4000  
+                            "silence_duration_ms": 6500  
                         },
                         "temperature": 0.6,
                         "max_response_output_tokens": 300

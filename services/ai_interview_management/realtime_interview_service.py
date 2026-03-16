@@ -499,11 +499,11 @@ class RealtimeInterviewService:
                         },
                         "turn_detection": {
                             "type": "server_vad",
-                            "threshold": 0.3,  
+                            "threshold": 0.45,  
                             "prefix_padding_ms": 1000,  
                             "silence_duration_ms": 6500  
                         },
-                        "temperature": 0.6,
+                        "temperature": 0.3,
                         "max_response_output_tokens": 300
                     },
                     timeout=30.0

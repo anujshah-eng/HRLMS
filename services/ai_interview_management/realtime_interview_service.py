@@ -91,7 +91,7 @@ class RealtimeInterviewService:
         Notify external backend about interview completion.
         This runs in the background to avoid blocking the user response.
         """
-        url = os.getenv("EXTERNAL_STATUS_API_URL", "https://dev-backend.acelucid.com/api/ai/session/status")
+        url = os.getenv("EXTERNAL_STATUS_API_URL", "https://lms.acelucid.com/api/ai/session/status")
         
         
         final_score = int(round(score)) if score is not None else 0
@@ -499,11 +499,11 @@ class RealtimeInterviewService:
                         },
                         "turn_detection": {
                             "type": "server_vad",
-                            "threshold": 0.5,  
-                            "prefix_padding_ms": 300,  
-                            "silence_duration_ms": 4000  
+                            "threshold": 0.45,  
+                            "prefix_padding_ms": 1000,  
+                            "silence_duration_ms": 6500  
                         },
-                        "temperature": 0.6,
+                        "temperature": 0.6,  
                         "max_response_output_tokens": 300
                     },
                     timeout=30.0
@@ -581,12 +581,11 @@ class RealtimeInterviewService:
         instructions = HR_SCREENING_SYSTEM_PROMPT.format(
             role=role,
             duration=f"{duration} minutes",
-            min_questions=min_questions,
             job_description_context=job_description or "No specific job description provided.",
             questions_context=questions_context
         )
 
-        logger.info(f"System instructions created - Role: {role}, Duration: {duration} mins, Min Questions: {min_questions}")
+        logger.info(f"System instructions created - Role: {role}, Duration: {duration} mins")
 
         return instructions
 

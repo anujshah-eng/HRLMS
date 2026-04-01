@@ -91,17 +91,24 @@ class RealtimeInterviewService:
         self,
         mongodb_collection,
         session_id: str,
-        video_bytes: bytes,
+        video_file,
+        file_size: Optional[int] = None,
         content_type: str = "video/webm"
     ) -> dict:
-        """Upload a candidate interview recording to S3 and save URL to MongoDB"""
+        """
+        Upload a candidate interview recording to S3 using multipart streaming.
+
+        The file is streamed directly from the request into S3 in 10MB chunks —
+        it is never fully loaded into server RAM. Files over 10MB automatically
+        use S3 multipart upload with up to 4 parallel part uploads.
+        """
         if not self.s3_bucket_name or not self.aws_access_key or not self.aws_secret_key:
             raise CustomException(
                 "AWS S3 credentials are not configured.",
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
-        # Determine file extension from content type
+        
         ext_map = {
             "video/webm": "webm",
             "video/mp4": "mp4",
@@ -114,7 +121,15 @@ class RealtimeInterviewService:
         uploaded_at = now.isoformat()
         safe_timestamp = now.strftime("%Y%m%d_%H%M%S")
         s3_key = f"{self.s3_recordings_folder}/{session_id}/{safe_timestamp}.{ext}"
-        file_size_bytes = len(video_bytes)
+
+        
+        from boto3.s3.transfer import TransferConfig
+        transfer_config = TransferConfig(
+            multipart_threshold=90 * 1024 * 1024,   
+            multipart_chunksize=10 * 1024 * 1024,   
+            max_concurrency=4,
+            use_threads=False                         
+        )
 
         async with aioboto3.Session().client(
             "s3",
@@ -122,12 +137,16 @@ class RealtimeInterviewService:
             aws_access_key_id=self.aws_access_key,
             aws_secret_access_key=self.aws_secret_key,
         ) as s3:
-            await s3.put_object(
-                Bucket=self.s3_bucket_name,
-                Key=s3_key,
-                Body=video_bytes,
-                ContentType=content_type,
+            await s3.upload_fileobj(
+                video_file,
+                self.s3_bucket_name,
+                s3_key,
+                ExtraArgs={"ContentType": content_type},
+                Config=transfer_config
             )
+
+        
+        file_size_bytes = file_size or 0
 
         video_url = f"https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
         logger.info(f"Recording uploaded for session {session_id}: {video_url} ({file_size_bytes} bytes)")
@@ -631,9 +650,7 @@ class RealtimeInterviewService:
 
         questions_context = mandatory_questions if mandatory_questions else "No specific pre-defined questions."
 
-        # Compute the minimum question count from the duration
-        # Formula: 1 question per 2 minutes, with a minimum floor of 3
-        # e.g. 5min→3, 10min→5, 15min→7, 20min→10, 25min→12, 30min→15
+        
         min_questions = max(3, duration // 2)
 
         instructions = HR_SCREENING_SYSTEM_PROMPT.format(

@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, status, Depends, Form, UploadFile, File
+from fastapi import APIRouter, status, Depends, Form, UploadFile, File, Request
 from dto.response_dto.response_dto import ResponseDto
 from services.ai_interview_management.realtime_interview_service import RealtimeInterviewService
 from custom_utilities.custom_exception import CustomException
@@ -185,12 +185,16 @@ async def save_interview_snapshot(
 
 @router.post("/realtime-interview/video", response_model=ResponseDto)
 async def save_interview_recording(
+    request: Request,
     session_id: str = Form(...),
     video: UploadFile = File(..., description="Interview recording video file (WebM/MP4) captured from candidate's camera"),
     mongodb_collection = Depends(get_realtime_interview_collection)
 ):
     """
     Upload the candidate's interview recording video to S3 and store the URL in MongoDB.
+
+    Uses S3 multipart upload — file is streamed in chunks directly to S3 without
+    loading the entire video into server memory.
 
     Called by the frontend once at the end of the interview (or when the timer expires).
     The video is uploaded to:  s3://hrms-ai-team/recordings/{session_id}/{timestamp}.webm
@@ -203,13 +207,24 @@ async def save_interview_recording(
     }
 
     **Supported formats:** video/webm, video/mp4, video/ogg, video/quicktime
+    **Max size:** 500MB (checked via Content-Length header before reading)
     """
     try:
-        video_bytes = await video.read()
+        MAX_VIDEO_SIZE_BYTES = 800 * 1024 * 1024  
+
+        
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_VIDEO_SIZE_BYTES:
+            raise CustomException(
+                f"Video file too large. Maximum allowed size is 800MB.",
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+            )
+
         result = await realtime_service.upload_video(
             mongodb_collection=mongodb_collection,
             session_id=session_id,
-            video_bytes=video_bytes,
+            video_file=video.file,
+            file_size=video.size,
             content_type=video.content_type or "video/webm",
         )
         return ResponseDto(

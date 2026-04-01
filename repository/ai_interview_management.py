@@ -283,3 +283,20 @@ class RealtimeInterviewMongoRepository:
             }
         )
         return result
+
+    async def append_video_url(self, mongodb_collection, session_id: str, video_url: str, uploaded_at: str, file_size_bytes: int = 0):
+        """Save the interview recording video URL to the session document"""
+        result = await mongodb_collection.update_one(
+            {"_id": session_id},
+            {
+                "$set": {
+                    "recording": {
+                        "url": video_url,
+                        "uploaded_at": uploaded_at,
+                        "file_size_bytes": file_size_bytes
+                    },
+                    "updated_at": datetime.now(timezone.utc)
+                }
+            }
+        )
+        return result

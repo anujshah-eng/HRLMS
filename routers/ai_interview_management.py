@@ -183,6 +183,57 @@ async def save_interview_snapshot(
         )
 
 
+@router.post("/realtime-interview/video", response_model=ResponseDto)
+async def save_interview_recording(
+    session_id: str = Form(...),
+    video: UploadFile = File(..., description="Interview recording video file (WebM/MP4) captured from candidate's camera"),
+    mongodb_collection = Depends(get_realtime_interview_collection)
+):
+    """
+    Upload the candidate's interview recording video to S3 and store the URL in MongoDB.
+
+    Called by the frontend once at the end of the interview (or when the timer expires).
+    The video is uploaded to:  s3://hrms-ai-team/recordings/{session_id}/{timestamp}.webm
+
+    The stored URL is saved in the interview session document under 'recording':
+    {
+        "url": "https://...",
+        "uploaded_at": "2024-01-01T10:30:00Z",
+        "file_size_bytes": 12345678
+    }
+
+    **Supported formats:** video/webm, video/mp4, video/ogg, video/quicktime
+    """
+    try:
+        video_bytes = await video.read()
+        result = await realtime_service.upload_video(
+            mongodb_collection=mongodb_collection,
+            session_id=session_id,
+            video_bytes=video_bytes,
+            content_type=video.content_type or "video/webm",
+        )
+        return ResponseDto(
+            Data=result,
+            Success=True,
+            Message="Interview recording uploaded successfully",
+            Status=status.HTTP_200_OK
+        )
+    except CustomException as e:
+        return ResponseDto(
+            Data=None,
+            Success=False,
+            Message=str(e),
+            Status=e.status_code
+        )
+    except Exception as e:
+        return ResponseDto(
+            Data=None,
+            Success=False,
+            Message=f"Failed to upload recording: {str(e)}",
+            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @router.post("/realtime-interview/update-conversation", response_model=ResponseDto)
 async def update_conversation(
     session_id: str = Form(...),

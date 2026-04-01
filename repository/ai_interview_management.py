@@ -284,17 +284,21 @@ class RealtimeInterviewMongoRepository:
         )
         return result
 
-    async def append_video_url(self, mongodb_collection, session_id: str, video_url: str, uploaded_at: str, file_size_bytes: int = 0):
-        """Save the interview recording video URL to the session document"""
+    async def append_video_url(self, mongodb_collection, session_id: str, video_url: str, uploaded_at: str, file_size_bytes: int = 0, sha256_checksum: str = None):
+        """Save the interview recording video URL and integrity checksum to the session document"""
+        recording = {
+            "url": video_url,
+            "uploaded_at": uploaded_at,
+            "file_size_bytes": file_size_bytes
+        }
+        if sha256_checksum:
+            recording["sha256_checksum"] = sha256_checksum
+
         result = await mongodb_collection.update_one(
             {"_id": session_id},
             {
                 "$set": {
-                    "recording": {
-                        "url": video_url,
-                        "uploaded_at": uploaded_at,
-                        "file_size_bytes": file_size_bytes
-                    },
+                    "recording": recording,
                     "updated_at": datetime.now(timezone.utc)
                 }
             }

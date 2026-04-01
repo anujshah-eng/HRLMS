@@ -163,6 +163,107 @@ class RealtimeInterviewService:
         }
 
 
+    async def upload_video_background(
+        self,
+        mongodb_collection,
+        session_id: str,
+        tmp_file_path: str,
+        content_type: str = "video/webm",
+        file_size: Optional[int] = None
+    ) -> None:
+        """
+        Background task: Upload interview recording from temp file to S3.
+
+        Runs AFTER the API has already returned to the frontend.
+        The candidate sees 'Interview submitted' while this runs silently.
+
+        Steps:
+          1. Open temp file from disk
+          2. Upload to S3 using multipart (files > 90MB split into 10MB chunks)
+          3. Save video URL to MongoDB
+          4. Delete temp file from disk (cleanup)
+        """
+        import os
+        try:
+            if not self.s3_bucket_name or not self.aws_access_key or not self.aws_secret_key:
+                logger.error(f"Background video upload failed for {session_id}: AWS credentials not configured.")
+                return
+
+            ext_map = {
+                "video/webm": "webm",
+                "video/mp4": "mp4",
+                "video/ogg": "ogg",
+                "video/quicktime": "mov",
+            }
+            ext = ext_map.get(content_type, "webm")
+
+            now = datetime.now(timezone.utc)
+            uploaded_at = now.isoformat()
+            safe_timestamp = now.strftime("%Y%m%d_%H%M%S")
+            s3_key = f"{self.s3_recordings_folder}/{session_id}/{safe_timestamp}.{ext}"
+
+            from boto3.s3.transfer import TransferConfig
+            transfer_config = TransferConfig(
+                multipart_threshold=90 * 1024 * 1024,  # 90 MB — single PUT below this
+                multipart_chunksize=10 * 1024 * 1024,  # 10 MB per chunk above threshold
+                max_concurrency=4,
+                use_threads=False                        # Must be False for asyncio
+            )
+
+            logger.info(f"Background upload started for session {session_id} from {tmp_file_path}")
+
+            # Step 1: Calculate SHA-256 checksum of the full file (for MongoDB audit trail)
+            # Note: boto3 handles per-part S3 checksum verification automatically via ChecksumAlgorithm
+            import hashlib
+            sha256 = hashlib.sha256()
+            with open(tmp_file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    sha256.update(chunk)
+            checksum_hex = sha256.hexdigest()  # stored in MongoDB for future integrity audits
+            logger.info(f"SHA-256 checksum for session {session_id}: {checksum_hex}")
+
+            # Step 2: Upload to S3 with checksum — S3 re-calculates and rejects if mismatch
+            with open(tmp_file_path, "rb") as video_file:
+                async with aioboto3.Session().client(
+                    "s3",
+                    region_name=self.aws_region,
+                    aws_access_key_id=self.aws_access_key,
+                    aws_secret_access_key=self.aws_secret_key,
+                ) as s3:
+                    await s3.upload_fileobj(
+                        video_file,
+                        self.s3_bucket_name,
+                        s3_key,
+                        ExtraArgs={
+                            "ContentType": content_type,
+                            "ChecksumAlgorithm": "SHA256",   # S3 verifies integrity per-part
+                        },
+                        Config=transfer_config
+                    )
+
+            file_size_bytes = file_size or (os.path.getsize(tmp_file_path) if os.path.exists(tmp_file_path) else 0)
+            video_url = f"https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
+
+            logger.info(f"Background upload complete for session {session_id}: {video_url}")
+
+            # Step 3: Save URL + checksum to MongoDB
+            if mongodb_collection is not None:
+                await self.mongo_repo.append_video_url(
+                    mongodb_collection, session_id, video_url, uploaded_at,
+                    file_size_bytes, sha256_checksum=checksum_hex
+                )
+
+        except Exception as e:
+            logger.error(f"Background video upload failed for session {session_id}: {str(e)}")
+        finally:
+            # Always clean up temp file from disk
+            try:
+                if os.path.exists(tmp_file_path):
+                    os.remove(tmp_file_path)
+                    logger.info(f"Temp file deleted: {tmp_file_path}")
+            except Exception as cleanup_err:
+                logger.warning(f"Could not delete temp file {tmp_file_path}: {cleanup_err}")
+
     async def _notify_external_backend(self, front_end_session_id: int, status: str, score: float, token: str):
         """
         Notify external backend about interview completion.

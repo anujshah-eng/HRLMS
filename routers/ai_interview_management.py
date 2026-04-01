@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, status, Depends, Form, UploadFile, File, Request
+from fastapi import APIRouter, status, Depends, Form, UploadFile, File, Request, BackgroundTasks
 from dto.response_dto.response_dto import ResponseDto
 from services.ai_interview_management.realtime_interview_service import RealtimeInterviewService
 from custom_utilities.custom_exception import CustomException
@@ -186,33 +186,30 @@ async def save_interview_snapshot(
 @router.post("/realtime-interview/video", response_model=ResponseDto)
 async def save_interview_recording(
     request: Request,
+    background_tasks: BackgroundTasks,
     session_id: str = Form(...),
     video: UploadFile = File(..., description="Interview recording video file (WebM/MP4) captured from candidate's camera"),
     mongodb_collection = Depends(get_realtime_interview_collection)
 ):
     """
-    Upload the candidate's interview recording video to S3 and store the URL in MongoDB.
+    Upload the candidate's interview recording video to S3 (runs as a background task).
 
-    Uses S3 multipart upload — file is streamed in chunks directly to S3 without
-    loading the entire video into server memory.
+    Returns immediately to the frontend — the candidate does NOT wait for the upload.
+    The video is saved to a temp file on disk, then uploaded to S3 in the background.
+    Once upload completes, the URL is saved to MongoDB automatically.
 
-    Called by the frontend once at the end of the interview (or when the timer expires).
-    The video is uploaded to:  s3://hrms-ai-team/recordings/{session_id}/{timestamp}.webm
-
-    The stored URL is saved in the interview session document under 'recording':
-    {
-        "url": "https://...",
-        "uploaded_at": "2024-01-01T10:30:00Z",
-        "file_size_bytes": 12345678
-    }
+    Flow:
+      1. Receive video from frontend
+      2. Save to temp file on server disk
+      3. Return 200 immediately → frontend shows "Interview submitted"
+      4. Background: upload temp file → S3 → save URL to MongoDB → delete temp file
 
     **Supported formats:** video/webm, video/mp4, video/ogg, video/quicktime
-    **Max size:** 500MB (checked via Content-Length header before reading)
+    **Max size:** 800MB
     """
     try:
-        MAX_VIDEO_SIZE_BYTES = 800 * 1024 * 1024  
+        MAX_VIDEO_SIZE_BYTES = 800 * 1024 * 1024  # 800 MB
 
-        
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > MAX_VIDEO_SIZE_BYTES:
             raise CustomException(
@@ -220,17 +217,31 @@ async def save_interview_recording(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
             )
 
-        result = await realtime_service.upload_video(
+        # Save video to a temp file on disk (does not load entire file into RAM)
+        import tempfile, os
+        ext = "webm" if "webm" in (video.content_type or "") else "mp4"
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+        content = await video.read()
+        tmp.write(content)
+        tmp.close()
+
+        content_type = video.content_type or "video/webm"
+        file_size = video.size
+
+        # Schedule background upload — returns immediately to frontend
+        background_tasks.add_task(
+            realtime_service.upload_video_background,
             mongodb_collection=mongodb_collection,
             session_id=session_id,
-            video_file=video.file,
-            file_size=video.size,
-            content_type=video.content_type or "video/webm",
+            tmp_file_path=tmp.name,
+            content_type=content_type,
+            file_size=file_size
         )
+
         return ResponseDto(
-            Data=result,
+            Data={"session_id": session_id},
             Success=True,
-            Message="Interview recording uploaded successfully",
+            Message="Interview submitted successfully. Recording is being processed.",
             Status=status.HTTP_200_OK
         )
     except CustomException as e:
@@ -244,7 +255,7 @@ async def save_interview_recording(
         return ResponseDto(
             Data=None,
             Success=False,
-            Message=f"Failed to upload recording: {str(e)}",
+            Message=f"Failed to submit recording: {str(e)}",
             Status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

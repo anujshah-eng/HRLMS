@@ -1,5 +1,8 @@
+import logging
 from datetime import datetime, timezone
 from models.ai_interviewer import AIInterviewer
+
+logger = logging.getLogger(__name__)
 
 class AIInterviewRolesRepository:
     def __init__(self, mongodb_collection=None):
@@ -303,4 +306,10 @@ class RealtimeInterviewMongoRepository:
                 }
             }
         )
+
+        if result.matched_count == 0:
+            logger.warning(f"⚠️ append_video_url: No document found with _id='{session_id}'. Video URL NOT saved to MongoDB.")
+        else:
+            logger.info(f"✅ append_video_url: Recording saved to MongoDB for session '{session_id}'.")
+
         return result

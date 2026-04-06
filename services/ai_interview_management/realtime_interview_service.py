@@ -37,6 +37,7 @@ class RealtimeInterviewService:
         self.aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
         self.aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
         self.s3_snapshot_folder = os.getenv("AWS_S3_SNAPSHOT_FOLDER", "snapshots")
+        self.s3_recordings_folder = os.getenv("AWS_S3_RECORDINGS_FOLDER", "recordings")
         self.prompts_dir = Path(__file__).parent.parent.parent / "agents" / "ai_interview" / "system_prompts"
 
 
@@ -54,13 +55,13 @@ class RealtimeInterviewService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
-        # Use URL-safe timestamp (no colons, plus signs, or spaces)
+        
         now = datetime.now(timezone.utc)
         captured_at = now.isoformat()
         safe_timestamp = now.strftime("%Y%m%d_%H%M%S")
         s3_key = f"{self.s3_snapshot_folder}/{session_id}/{safe_timestamp}.jpg"
 
-        # Upload to S3
+       
         async with aioboto3.Session().client(
             "s3",
             region_name=self.aws_region,
@@ -77,7 +78,7 @@ class RealtimeInterviewService:
         snapshot_url = f"https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
         logger.info(f"Snapshot uploaded for session {session_id}: {snapshot_url}")
 
-        # Save URL to MongoDB
+        
         if mongodb_collection is not None:
             await self.mongo_repo.append_snapshot_url(
                 mongodb_collection, session_id, snapshot_url, captured_at
@@ -86,12 +87,189 @@ class RealtimeInterviewService:
         return {"snapshot_url": snapshot_url, "captured_at": captured_at}
 
 
+    async def upload_video(
+        self,
+        mongodb_collection,
+        session_id: str,
+        video_file,
+        file_size: Optional[int] = None,
+        content_type: str = "video/webm"
+    ) -> dict:
+        """
+        Upload a candidate interview recording to S3 using multipart streaming.
+
+        The file is streamed directly from the request into S3 in 10MB chunks —
+        it is never fully loaded into server RAM. Files over 10MB automatically
+        use S3 multipart upload with up to 4 parallel part uploads.
+        """
+        if not self.s3_bucket_name or not self.aws_access_key or not self.aws_secret_key:
+            raise CustomException(
+                "AWS S3 credentials are not configured.",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        
+        ext_map = {
+            "video/webm": "webm",
+            "video/mp4": "mp4",
+            "video/ogg": "ogg",
+            "video/quicktime": "mov",
+        }
+        ext = ext_map.get(content_type, "webm")
+
+        now = datetime.now(timezone.utc)
+        uploaded_at = now.isoformat()
+        safe_timestamp = now.strftime("%Y%m%d_%H%M%S")
+        s3_key = f"{self.s3_recordings_folder}/{session_id}/{safe_timestamp}.{ext}"
+
+        
+        from boto3.s3.transfer import TransferConfig
+        transfer_config = TransferConfig(
+            multipart_threshold=90 * 1024 * 1024,   
+            multipart_chunksize=10 * 1024 * 1024,   
+            max_concurrency=4,
+            use_threads=False                         
+        )
+
+        async with aioboto3.Session().client(
+            "s3",
+            region_name=self.aws_region,
+            aws_access_key_id=self.aws_access_key,
+            aws_secret_access_key=self.aws_secret_key,
+        ) as s3:
+            await s3.upload_fileobj(
+                video_file,
+                self.s3_bucket_name,
+                s3_key,
+                ExtraArgs={"ContentType": content_type},
+                Config=transfer_config
+            )
+
+        
+        file_size_bytes = file_size or 0
+
+        video_url = f"https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
+        logger.info(f"Recording uploaded for session {session_id}: {video_url} ({file_size_bytes} bytes)")
+
+        if mongodb_collection is not None:
+            await self.mongo_repo.append_video_url(
+                mongodb_collection, session_id, video_url, uploaded_at, file_size_bytes
+            )
+
+        return {
+            "video_url": video_url,
+            "uploaded_at": uploaded_at,
+            "file_size_bytes": file_size_bytes
+        }
+
+
+    async def upload_video_background(
+        self,
+        mongodb_collection,
+        session_id: str,
+        tmp_file_path: str,
+        content_type: str = "video/webm",
+        file_size: Optional[int] = None
+    ) -> None:
+        """
+        Background task: Upload interview recording from temp file to S3.
+
+        Runs AFTER the API has already returned to the frontend.
+        The candidate sees 'Interview submitted' while this runs silently.
+
+        Steps:
+          1. Open temp file from disk
+          2. Upload to S3 using multipart (files > 90MB split into 10MB chunks)
+          3. Save video URL to MongoDB
+          4. Delete temp file from disk (cleanup)
+        """
+        import os
+        try:
+            if not self.s3_bucket_name or not self.aws_access_key or not self.aws_secret_key:
+                logger.error(f"Background video upload failed for {session_id}: AWS credentials not configured.")
+                return
+
+            ext_map = {
+                "video/webm": "webm",
+                "video/mp4": "mp4",
+                "video/ogg": "ogg",
+                "video/quicktime": "mov",
+            }
+            ext = ext_map.get(content_type, "webm")
+
+            now = datetime.now(timezone.utc)
+            uploaded_at = now.isoformat()
+            safe_timestamp = now.strftime("%Y%m%d_%H%M%S")
+            s3_key = f"{self.s3_recordings_folder}/{session_id}/{safe_timestamp}.{ext}"
+
+            from boto3.s3.transfer import TransferConfig
+            transfer_config = TransferConfig(
+                multipart_threshold=90 * 1024 * 1024,  # 90 MB — single PUT below this
+                multipart_chunksize=10 * 1024 * 1024,  # 10 MB per chunk above threshold
+                max_concurrency=4,
+                use_threads=False                        # Must be False for asyncio
+            )
+
+            logger.info(f"Background upload started for session {session_id} from {tmp_file_path}")
+
+            # Step 1: Calculate SHA-256 checksum of the full file (for MongoDB audit trail)
+            # Note: boto3 handles per-part S3 checksum verification automatically via ChecksumAlgorithm
+            import hashlib
+            sha256 = hashlib.sha256()
+            with open(tmp_file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    sha256.update(chunk)
+            checksum_hex = sha256.hexdigest()  # stored in MongoDB for future integrity audits
+            logger.info(f"SHA-256 checksum for session {session_id}: {checksum_hex}")
+
+            # Step 2: Upload to S3 with checksum — S3 re-calculates and rejects if mismatch
+            with open(tmp_file_path, "rb") as video_file:
+                async with aioboto3.Session().client(
+                    "s3",
+                    region_name=self.aws_region,
+                    aws_access_key_id=self.aws_access_key,
+                    aws_secret_access_key=self.aws_secret_key,
+                ) as s3:
+                    await s3.upload_fileobj(
+                        video_file,
+                        self.s3_bucket_name,
+                        s3_key,
+                        ExtraArgs={
+                            "ContentType": content_type,
+                            "ChecksumAlgorithm": "SHA256",   # S3 verifies integrity per-part
+                        },
+                        Config=transfer_config
+                    )
+
+            file_size_bytes = file_size or (os.path.getsize(tmp_file_path) if os.path.exists(tmp_file_path) else 0)
+            video_url = f"https://{self.s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
+
+            logger.info(f"Background upload complete for session {session_id}: {video_url}")
+
+            # Step 3: Save URL + checksum to MongoDB
+            if mongodb_collection is not None:
+                await self.mongo_repo.append_video_url(
+                    mongodb_collection, session_id, video_url, uploaded_at,
+                    file_size_bytes, sha256_checksum=checksum_hex
+                )
+
+        except Exception as e:
+            logger.error(f"Background video upload failed for session {session_id}: {str(e)}")
+        finally:
+            # Always clean up temp file from disk
+            try:
+                if os.path.exists(tmp_file_path):
+                    os.remove(tmp_file_path)
+                    logger.info(f"Temp file deleted: {tmp_file_path}")
+            except Exception as cleanup_err:
+                logger.warning(f"Could not delete temp file {tmp_file_path}: {cleanup_err}")
+
     async def _notify_external_backend(self, front_end_session_id: int, status: str, score: float, token: str):
         """
         Notify external backend about interview completion.
         This runs in the background to avoid blocking the user response.
         """
-        url = os.getenv("EXTERNAL_STATUS_API_URL", "https://lms.acelucid.com/api/ai/session/status")
+        url = os.getenv("EXTERNAL_STATUS_API_URL", "https://dev-backend.acelucid.com/api/ai/session/status")
         
         
         final_score = int(round(score)) if score is not None else 0
@@ -225,15 +403,15 @@ class RealtimeInterviewService:
         if questions:
             parsed_questions = []
             try:
-                # Try parsing as JSON first
+                
                 parsed_questions = json.loads(questions)
             except Exception:
-                # Fallback: Treat as raw string
+                
                 logger.debug("Failed to parse questions as JSON, treating as plain text")
                 parsed_questions = questions
 
             if isinstance(parsed_questions, list):
-                # Handle List (JSON array)
+                
                 for q in parsed_questions:
                     if isinstance(q, dict) and "question" in q:
                         final_questions_list.append({
@@ -248,7 +426,7 @@ class RealtimeInterviewService:
                             "question_id": str(uuid.uuid4())
                         })
             elif isinstance(parsed_questions, str):
-                # Handle String (Split by newlines)
+                
                 lines = [line.strip() for line in parsed_questions.split('\n') if line.strip()]
                 for line in lines:
                     final_questions_list.append({
@@ -573,9 +751,7 @@ class RealtimeInterviewService:
 
         questions_context = mandatory_questions if mandatory_questions else "No specific pre-defined questions."
 
-        # Compute the minimum question count from the duration
-        # Formula: 1 question per 2 minutes, with a minimum floor of 3
-        # e.g. 5min→3, 10min→5, 15min→7, 20min→10, 25min→12, 30min→15
+        
         min_questions = max(3, duration // 2)
 
         instructions = HR_SCREENING_SYSTEM_PROMPT.format(
@@ -801,6 +977,58 @@ class RealtimeInterviewService:
 
         return evaluation_data
 
+    async def update_conversation_background(
+        self,
+        mongodb_collection,
+        session_id: str,
+        conversation_json: str
+    ) -> None:
+        """
+        Background task: Save conversation transcript and compute token costs.
+
+        Runs AFTER the API has already returned 200 to the frontend.
+        All errors are logged silently — no HTTP client is waiting.
+        """
+        try:
+            logger.info(f"Background conversation update started for session {session_id}")
+            result = await self.update_conversation(
+                mongodb_collection=mongodb_collection,
+                session_id=session_id,
+                conversation_json=conversation_json
+            )
+            logger.info(
+                f"✅ Background conversation update complete for session {session_id}. "
+                f"Messages: {result.get('conversation_messages')}, "
+                f"Tokens: {result.get('realtime_api_tokens')}, "
+                f"Total cost: ${result.get('total_cost_usd')}"
+            )
+        except Exception as e:
+            logger.error(f"❌ Background conversation update failed for session {session_id}: {str(e)}")
+
+    async def evaluate_interview_background(
+        self,
+        mongodb_collection,
+        session_id: str,
+        passing_score: Optional[int] = None
+    ) -> None:
+        """
+        Background task: Run AI evaluation on completed interview.
+
+        Runs AFTER the API has already returned 200 to the frontend.
+        All errors are logged silently — no HTTP client is waiting.
+        External backend is notified inside evaluate_interview on success.
+        """
+        try:
+            logger.info(f"Background evaluation started for session {session_id}")
+            await self.evaluate_interview(
+                mongodb_collection=mongodb_collection,
+                session_id=session_id,
+                passing_score=passing_score
+            )
+            logger.info(f"✅ Background evaluation complete for session {session_id}")
+        except Exception as e:
+            logger.error(f"❌ Background evaluation failed for session {session_id}: {str(e)}")
+
     async def get_interviewers(self, ai_interviewers_collection) -> list[dict]:
         """
         Get list of available interviewers with voice models from database.
@@ -987,6 +1215,9 @@ class RealtimeInterviewService:
 
         # Attach proctoring snapshots from the session document
         evaluation["snapshots"] = session.get("snapshots", [])
+
+        # Attach interview recording video URL from the session document
+        evaluation["recording"] = session.get("recording", None)
 
         return evaluation
 

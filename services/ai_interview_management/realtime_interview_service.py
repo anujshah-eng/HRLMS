@@ -977,6 +977,58 @@ class RealtimeInterviewService:
 
         return evaluation_data
 
+    async def update_conversation_background(
+        self,
+        mongodb_collection,
+        session_id: str,
+        conversation_json: str
+    ) -> None:
+        """
+        Background task: Save conversation transcript and compute token costs.
+
+        Runs AFTER the API has already returned 200 to the frontend.
+        All errors are logged silently — no HTTP client is waiting.
+        """
+        try:
+            logger.info(f"Background conversation update started for session {session_id}")
+            result = await self.update_conversation(
+                mongodb_collection=mongodb_collection,
+                session_id=session_id,
+                conversation_json=conversation_json
+            )
+            logger.info(
+                f"✅ Background conversation update complete for session {session_id}. "
+                f"Messages: {result.get('conversation_messages')}, "
+                f"Tokens: {result.get('realtime_api_tokens')}, "
+                f"Total cost: ${result.get('total_cost_usd')}"
+            )
+        except Exception as e:
+            logger.error(f"❌ Background conversation update failed for session {session_id}: {str(e)}")
+
+    async def evaluate_interview_background(
+        self,
+        mongodb_collection,
+        session_id: str,
+        passing_score: Optional[int] = None
+    ) -> None:
+        """
+        Background task: Run AI evaluation on completed interview.
+
+        Runs AFTER the API has already returned 200 to the frontend.
+        All errors are logged silently — no HTTP client is waiting.
+        External backend is notified inside evaluate_interview on success.
+        """
+        try:
+            logger.info(f"Background evaluation started for session {session_id}")
+            await self.evaluate_interview(
+                mongodb_collection=mongodb_collection,
+                session_id=session_id,
+                passing_score=passing_score
+            )
+            logger.info(f"✅ Background evaluation complete for session {session_id}")
+        except Exception as e:
+            logger.error(f"❌ Background evaluation failed for session {session_id}: {str(e)}")
+
     async def get_interviewers(self, ai_interviewers_collection) -> list[dict]:
         """
         Get list of available interviewers with voice models from database.

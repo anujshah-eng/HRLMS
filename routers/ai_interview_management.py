@@ -262,16 +262,16 @@ async def save_interview_recording(
 
 @router.post("/realtime-interview/update-conversation", response_model=ResponseDto)
 async def update_conversation(
+    background_tasks: BackgroundTasks,
     session_id: str = Form(...),
     conversation_json: str = Form(...),
-    
     mongodb_collection = Depends(get_realtime_interview_collection)
 ):
     """
     Update conversation transcript for the interview session.
-    
-    This endpoint is used to sync the client-side conversation state with the server.
-    It acts as a backup and allows for persistence of the interview dialog for later analysis.
+
+    Returns immediately — conversation saving and token calculation run in the background.
+    The candidate does not wait for this to complete.
 
     conversation_json format:
     [
@@ -280,84 +280,54 @@ async def update_conversation(
         ...
     ]
     """
-    try:
-        result = await realtime_service.update_conversation(
-            mongodb_collection=mongodb_collection,
-            session_id=session_id,
-            conversation_json=conversation_json
-        )
+    background_tasks.add_task(
+        realtime_service.update_conversation_background,
+        mongodb_collection=mongodb_collection,
+        session_id=session_id,
+        conversation_json=conversation_json
+    )
 
-        return ResponseDto(
-            Data=result,
-            Success=True,
-            Message="Conversation updated successfully",
-            Status=status.HTTP_200_OK
-        )
-
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=f"Failed to update conversation: {str(e)}",
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    return ResponseDto(
+        Data=None,
+        Success=True,
+        Message="Conversation update in progress",
+        Status=status.HTTP_200_OK
+    )
 
 
 @router.post("/realtime-interview/evaluate", response_model=ResponseDto)
 async def evaluate_interview(
+    background_tasks: BackgroundTasks,
     session_id: str = Form(...),
     passing_score: Optional[int] = Form(None),
-    
     mongodb_collection = Depends(get_realtime_interview_collection)
 ):
     """
     Evaluate completed interview session using AI.
 
-    This triggers a comprehensive analysis of the interview transcript.
-    
+    Returns immediately — LLM evaluation runs in the background.
+    The candidate does not wait for evaluation to complete.
+    The external backend is notified automatically once evaluation finishes.
+
     Features:
     - Overall performance scoring
     - Detailed feedback on strengths and weaknesses
     - Question-by-question analysis
     - Actionable recommendations for the candidate
-    
-    Note: This process may take a few seconds as it involves LLM processing.
     """
-    try:
-        evaluation_data = await realtime_service.evaluate_interview(
-            mongodb_collection=mongodb_collection,
-            session_id=session_id,
-            passing_score=passing_score
-        )
+    background_tasks.add_task(
+        realtime_service.evaluate_interview_background,
+        mongodb_collection=mongodb_collection,
+        session_id=session_id,
+        passing_score=passing_score
+    )
 
-        return ResponseDto(
-            Data=None,
-            Success=True,
-            Message="Interview evaluation completed successfully",
-            Status=status.HTTP_200_OK
-        )
-
-    except CustomException as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=str(e),
-            Status=e.status_code
-        )
-    except Exception as e:
-        return ResponseDto(
-            Data=None,
-            Success=False,
-            Message=f"Evaluation failed: {str(e)}",
-            Status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    return ResponseDto(
+        Data=None,
+        Success=True,
+        Message="Evaluation in progress",
+        Status=status.HTTP_200_OK
+    )
 
 
 @router.get("/interviewers", response_model=ResponseDto)

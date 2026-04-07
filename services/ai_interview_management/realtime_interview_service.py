@@ -1017,9 +1017,42 @@ class RealtimeInterviewService:
         Runs AFTER the API has already returned 200 to the frontend.
         All errors are logged silently — no HTTP client is waiting.
         External backend is notified inside evaluate_interview on success.
+
+        Retries up to 10 times (every 3s = 30s total) waiting for
+        update-conversation to finish and set status to 'completed'.
+        This handles the case where frontend calls both APIs in parallel.
         """
+        import asyncio
+
         try:
             logger.info(f"Background evaluation started for session {session_id}")
+
+            # Wait for update-conversation to finish (race condition guard)
+            max_attempts = 10
+            retry_interval = 3  # seconds
+
+            for attempt in range(1, max_attempts + 1):
+                session = await self.mongo_repo.get_session_by_id(mongodb_collection, session_id)
+                status_ok = session and session.get("status") in ["completed", "evaluated"]
+                conversation_ok = session and len(session.get("conversation", [])) > 0
+                if status_ok and conversation_ok:
+                    logger.info(f"Session {session_id} is ready for evaluation (attempt {attempt})")
+                    break
+                logger.info(
+                    f"Session {session_id} not ready yet — "
+                    f"status='{session.get('status') if session else 'not found'}', "
+                    f"conversation_messages={len(session.get('conversation', [])) if session else 0} "
+                    f"— waiting {retry_interval}s ({attempt}/{max_attempts})"
+                )
+                await asyncio.sleep(retry_interval)
+            else:
+                # All retries exhausted
+                logger.error(
+                    f"❌ Evaluation aborted for session {session_id}: "
+                    f"session never reached 'completed' status after {max_attempts * retry_interval}s"
+                )
+                return
+
             await self.evaluate_interview(
                 mongodb_collection=mongodb_collection,
                 session_id=session_id,
@@ -1028,6 +1061,7 @@ class RealtimeInterviewService:
             logger.info(f"✅ Background evaluation complete for session {session_id}")
         except Exception as e:
             logger.error(f"❌ Background evaluation failed for session {session_id}: {str(e)}")
+
 
     async def get_interviewers(self, ai_interviewers_collection) -> list[dict]:
         """
